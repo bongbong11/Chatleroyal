@@ -905,19 +905,11 @@ function openPanel() {
 
     document.getElementById('ba-close')?.addEventListener('click', closePanel);
     document.getElementById('ba-theme-btn')?.addEventListener('click', () => {
-        const next = _theme === 'dark' ? 'light' : 'dark';
-        saveTheme(next);
         const wasTab = state.currentTab;
-        closePanel();
-        openPanel();
-        // 같은 탭으로 복귀
-        if (wasTab !== 'arena') switchTab(wasTab);
-    });
-    document.getElementById('ba-theme-btn')?.addEventListener('click', () => {
         saveTheme(_theme === 'dark' ? 'light' : 'dark');
-        // 패널 재빌드
         closePanel();
         openPanel();
+        if (wasTab !== 'arena') switchTab(wasTab);
     });
     state.isPanelOpen=true;
     renderArenaTab();
