@@ -21,12 +21,12 @@ const THEMES = {
         tabInactive: '#442200',
     },
     light: {
-        bg: '#f5f0e8', bgCard: '#fffdf5', bgDeep: '#ece6d8',
-        border: '#c8a870', borderBright: '#a07840',
-        text: '#5a3a10', textDim: '#9a7a50', textBright: '#3a1a00',
-        accent: '#cc6600', gold: '#aa8800',
-        resultBg: '#fefcf5', resultBorder: '#c8a870',
-        tabInactive: '#b09060',
+        bg: '#f8f7ff', bgCard: '#ffffff', bgDeep: '#f0eeff',
+        border: '#c8b8ee', borderBright: '#8855cc',
+        text: '#3d2070', textDim: '#9988bb', textBright: '#220055',
+        accent: '#7733cc', gold: '#5511aa',
+        resultBg: '#fdfcff', resultBorder: '#c8b8ee',
+        tabInactive: '#aa99cc',
     },
 };
 let _theme = 'dark';
@@ -387,7 +387,7 @@ function openResultPanel(record) {
     const wm = winnerMatch(record.resultText);
 
     panel.innerHTML = `
-        <div id="ba-result-drag" style="background:linear-gradient(180deg,#1a0800,#0d0400);border-bottom:2px solid ${C().border};padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:move;flex-shrink:0;user-select:none">
+        <div id="ba-result-drag" style="background:${C().bg};border-bottom:2px solid ${C().border};padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:move;flex-shrink:0;user-select:none">
             <span style="font-size:14px">📜</span>
             <div style="flex:1;font-family:'Press Start 2P',monospace;font-size:11px;color:${C().accent};letter-spacing:2px">BATTLE REPORT</div>
             <button id="ba-result-close" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:10px;padding:2px 7px;font-family:monospace">✕</button>
@@ -474,9 +474,9 @@ Extract ONLY combat-relevant facts. Return in Korean, plain text, no JSON:
 
     const panel = document.createElement('div');
     panel.id = 'ba-combat-profile-panel';
-    panel.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(400px,90vw);max-height:80vh;background:${C().bgCard};border:2px solid ${C().borderBright};border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,0.5);z-index:10300;display:flex;flex-direction:column;overflow:hidden`;
+    panel.style.cssText = `position:fixed;top:80px;left:50%;transform:translateX(-50%);width:min(400px,90vw);max-height:75vh;background:${C().bgCard};border:2px solid ${C().borderBright};border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,0.5);z-index:10300;display:flex;flex-direction:column;overflow:hidden`;
     panel.innerHTML = `
-        <div style="background:${C().bg};border-bottom:1px solid ${C().border};padding:10px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <div id="ba-cp-drag" style="background:${C().bg};border-bottom:1px solid ${C().border};padding:10px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;cursor:move;user-select:none">
             <span style="font-size:14px">⚔️</span>
             <div style="flex:1;font-family:'Press Start 2P',monospace;font-size:9px;color:${C().accent};letter-spacing:1px">${esc(char.name)} — 전투 프로필</div>
             <button id="ba-cp-close" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:10px;padding:2px 6px;font-family:monospace">✕</button>
@@ -489,6 +489,7 @@ Extract ONLY combat-relevant facts. Return in Korean, plain text, no JSON:
         </div>`;
     document.body.appendChild(panel);
     document.getElementById('ba-cp-close')?.addEventListener('click',()=>panel.remove());
+    makeDraggable(panel, document.getElementById('ba-cp-drag'));
 
     try {
         const result = await callAI(prompt,
@@ -523,36 +524,25 @@ function showConditionModal() {
     document.getElementById('ba-condition-modal')?.remove();
     const modal = document.createElement('div');
     modal.id = 'ba-condition-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:#00000099;z-index:10200;display:flex;align-items:center;justify-content:center';
+    // 드래그 가능한 플로팅 패널 — 오버레이 없음
+    modal.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(380px,90vw);background:${C().bgCard};border:2px solid ${C().borderBright};border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,0.5);z-index:10200;display:flex;flex-direction:column;overflow:hidden`;
 
     modal.innerHTML = `
-        <div style="background:${C().bgCard};border:2px solid ${C().borderBright};border-radius:4px;padding:20px;width:min(400px,92vw);box-shadow:0 0 40px #ff440033;font-family:'Press Start 2P',monospace">
-            <div style="font-size:12px;color:${C().accent};letter-spacing:2px;margin-bottom:4px;text-align:center">⚔️ BATTLE CONDITION</div>
-            <div style="font-size:13px;color:${C().textDim};margin-bottom:12px;font-family:system-ui;text-align:center">어떤 상황에서 싸우나요?</div>
-            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
-                ${CHIPS.map(c=>`<div class="ba-chip" data-v="${esc(c)}" style="font-size:13px;font-family:system-ui;padding:4px 8px;background:#1a0800;border:1px solid ${C().border};border-radius:2px;color:${C().text};cursor:pointer;transition:all 0.1s">${esc(c)}</div>`).join('')}
-            </div>
-            <textarea id="ba-cond-ta" placeholder="예: 좁은 골목 야간 칼싸움. 양쪽 단도 1자루.&#10;예: 법정 최후변론 대결.&#10;예: 전면전 — 각자 100명 병력 지휘.&#10;(비워두면 기본 대결)" rows="4"
-                style="width:100%;background:#060400;border:1px solid ${C().border};border-radius:2px;padding:10px;color:${C().text};font-size:11px;font-family:'Noto Serif KR',system-ui;line-height:1.8;resize:vertical;outline:none;box-sizing:border-box;min-height:90px"></textarea>
-            <div style="display:flex;gap:8px;margin-top:12px">
-                <button id="ba-cond-cancel" style="flex:1;padding:10px;background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-family:'Press Start 2P',monospace;font-size:11px">CANCEL</button>
-                <button id="ba-cond-go" style="flex:1;padding:10px;background:linear-gradient(180deg,#331500,#1a0800);border:2px solid ${C().borderBright};border-radius:2px;color:${C().accent};cursor:pointer;font-family:'Press Start 2P',monospace;font-size:11px;text-shadow:0 0 6px ${C().accent}66">⚔️ FIGHT</button>
-            </div>
+        <div id="ba-cond-drag" style="background:${C().bg};border-bottom:1px solid ${C().border};padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:move;flex-shrink:0;user-select:none">
+            <span style="font-size:14px">⚔️</span>
+            <div style="flex:1;font-family:'Press Start 2P',monospace;font-size:9px;color:${C().accent};letter-spacing:1px">BATTLE CONDITION</div>
+            <button id="ba-cond-cancel" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:11px;padding:2px 7px;font-family:monospace;line-height:1">✕</button>
+        </div>
+        <div style="padding:16px">
+            <textarea id="ba-cond-ta" placeholder="어떤 상황에서 싸우나요?&#10;예) 좁은 골목 야간 칼싸움. 양쪽 단도 1자루.&#10;예) 법정 최후변론 대결.&#10;예) 전쟁터 — 각자 100명 병력 지휘.&#10;예) 말싸움 / 설전 / 협상 / 심리전&#10;비워두면 기본 대결로 진행합니다." rows="6"
+                style="width:100%;background:${C().bg};border:1px solid ${C().border};border-radius:2px;padding:10px;color:${C().text};font-size:12px;font-family:system-ui;line-height:1.8;resize:vertical;outline:none;box-sizing:border-box;min-height:110px"></textarea>
+            <button id="ba-cond-go" style="width:100%;margin-top:10px;padding:12px;background:${C().accent};border:none;border-radius:2px;color:#fff;cursor:pointer;font-family:'Press Start 2P',monospace;font-size:10px;letter-spacing:2px">⚔️  FIGHT!</button>
         </div>`;
 
     document.body.appendChild(modal);
-
-    modal.querySelectorAll('.ba-chip').forEach(chip => {
-        chip.addEventListener('mouseenter', ()=>{ chip.style.borderColor=C().accent; chip.style.color=C().accent; });
-        chip.addEventListener('mouseleave', ()=>{ chip.style.borderColor=C().border; chip.style.color=C().text; });
-        chip.addEventListener('click', () => {
-            const ta = document.getElementById('ba-cond-ta');
-            if (ta) ta.value = ta.value ? ta.value+', '+chip.dataset.v : chip.dataset.v;
-        });
-    });
+    makeDraggable(modal, document.getElementById('ba-cond-drag'));
 
     document.getElementById('ba-cond-cancel')?.addEventListener('click', ()=>modal.remove());
-    modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
     document.getElementById('ba-cond-go')?.addEventListener('click', async ()=>{
         const cond = document.getElementById('ba-cond-ta')?.value.trim()||'';
         modal.remove();
@@ -779,28 +769,26 @@ function renderSettingsTab() {
     const profiles = ctx.extensionSettings?.['connectionManager']?.profiles || [];
     const saved    = s.selectedProfileName || '';
 
-    content.innerHTML = `<div style="padding:16px;font-family:'Press Start 2P',monospace">
-        <div style="font-size:10px;color:${C().borderBright};letter-spacing:2px;border-bottom:1px solid ${C().border};padding-bottom:6px;margin-bottom:12px">AI CONFIG</div>
+    content.innerHTML = `<div style="padding:16px;font-family:system-ui,sans-serif">
+        <div style="font-size:9px;font-family:'Press Start 2P',monospace;color:${C().borderBright};letter-spacing:2px;border-bottom:1px solid ${C().border};padding-bottom:6px;margin-bottom:12px">AI CONFIG</div>
         <div style="margin-bottom:12px">
-            <div style="font-size:10px;color:${C().text};margin-bottom:6px;letter-spacing:1px">CONNECTION PROFILE</div>
-            <select id="ba-prof-sel" style="background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;color:${C().text};font-size:11px;padding:6px 8px;font-family:system-ui;outline:none;width:100%">
+            <div style="font-size:11px;color:${C().text};margin-bottom:5px">Connection Profile</div>
+            <select id="ba-prof-sel" style="background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;color:${C().text};font-size:12px;padding:6px 8px;font-family:system-ui;outline:none;width:100%">
                 <option value="">현재 연결 그대로</option>
                 ${profiles.map(p=>`<option value="${esc(p.name)}" ${p.name===saved?'selected':''}>${esc(p.name)}</option>`).join('')}
             </select>
         </div>
         <div style="margin-bottom:12px">
-            <div style="font-size:10px;color:${C().text};margin-bottom:6px;letter-spacing:1px">MAX TOKENS</div>
+            <div style="font-size:11px;color:${C().text};margin-bottom:5px">Max Tokens</div>
             <input id="ba-tok" type="number" min="500" max="16000" step="500" value="${s.maxTokens||4000}"
-                style="background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;color:${C().text};font-size:11px;padding:6px 8px;font-family:system-ui;outline:none;width:100%;box-sizing:border-box">
+                style="background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;color:${C().text};font-size:12px;padding:6px 8px;font-family:system-ui;outline:none;width:100%;box-sizing:border-box">
         </div>
-        <div style="font-size:13px;color:${C().textDim};margin-bottom:6px;letter-spacing:1px;line-height:2">NOTE: Battle uses 2 calls (profile per fighter + 1 final). Token cost = fighters × profile + final.</div>
         <div style="border-top:1px solid ${C().border};padding-top:12px;margin-top:12px">
-            <button id="ba-clear-recs" style="width:100%;background:none;border:1px solid #441100;border-radius:2px;padding:8px;cursor:pointer;color:#882200;font-size:10px;font-family:'Press Start 2P',monospace;letter-spacing:1px">🗑 CLEAR ALL RECORDS</button>
+            <button id="ba-clear-recs" style="width:100%;background:none;border:1px solid ${C().border};border-radius:2px;padding:8px;cursor:pointer;color:${C().textDim};font-size:12px;font-family:system-ui">🗑 기록 전체 삭제</button>
         </div>
-        <div style="margin-top:18px;font-size:13px;color:${C().textDim};letter-spacing:1px;line-height:2.5">
-            챗틀로얄 v1.0 · by 봉봉<br>
-            Reads Scouter roster (read-only)<br>
-            Records stored in chatl_royal settings
+        <div style="margin-top:14px;font-size:10px;color:${C().textDim};line-height:2;font-family:system-ui">
+            ※ 배틀 = 파이터수 × 프로파일 호출 + 최종 1회<br>
+            챗틀로얄 v2.0 · by 봉봉
         </div>
     </div>`;
 
@@ -917,8 +905,13 @@ function openPanel() {
 
     document.getElementById('ba-close')?.addEventListener('click', closePanel);
     document.getElementById('ba-theme-btn')?.addEventListener('click', () => {
-        saveTheme(_theme === 'dark' ? 'light' : 'dark');
-        closePanel(); openPanel();
+        const next = _theme === 'dark' ? 'light' : 'dark';
+        saveTheme(next);
+        const wasTab = state.currentTab;
+        closePanel();
+        openPanel();
+        // 같은 탭으로 복귀
+        if (wasTab !== 'arena') switchTab(wasTab);
     });
     document.getElementById('ba-theme-btn')?.addEventListener('click', () => {
         saveTheme(_theme === 'dark' ? 'light' : 'dark');
