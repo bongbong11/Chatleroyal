@@ -861,6 +861,21 @@ export async function onActivate() {
         });
     }
 
+    // 툴바 버튼
+    if (!document.getElementById('cr-wand-btn')) {
+        const btn = document.createElement('div');
+        btn.id = 'cr-wand-btn';
+        btn.title = '챗틀로얄';
+        btn.style.cssText = 'cursor:pointer;padding:4px 8px;display:flex;align-items:center;gap:5px;font-size:13px';
+        btn.innerHTML = '<span>⚔️</span><span style="font-size:12px">챗틀로얄</span>';
+        btn.addEventListener('click', () => {
+            if (!document.getElementById('cr-core')) createCore();
+            setTimeout(() => document.getElementById('cr-core')?.click(), 50);
+        });
+        const tb = document.getElementById('extensionsMenu') ?? document.getElementById('top-bar');
+        tb?.appendChild(btn);
+    }
+
     createCore();
 
     document.addEventListener('keydown', e => {
