@@ -10,13 +10,28 @@ import { event_types } from '../../../events.js';
 const MODULE_NAME = 'chatl_royal';
 const SCOUTER_KEY = 'character_lab';
 
-// ─── 색상 ──────────────────────────────────
-const C = {
-    bg: '#060400', bgCard: '#0d0600', bgDeep: '#030200',
-    border: '#442200', borderBright: '#884400',
-    text: '#cc9966', textDim: '#664422', textBright: '#ffcc88',
-    accent: '#ff8800', gold: '#ffaa00',
+// ─── 테마 ──────────────────────────────────
+const THEMES = {
+    dark: {
+        bg: '#060400', bgCard: '#0d0600', bgDeep: '#030200',
+        border: '#442200', borderBright: '#884400',
+        text: '#cc9966', textDim: '#664422', textBright: '#ffcc88',
+        accent: '#ff8800', gold: '#ffaa00',
+        resultBg: '#050300', resultBorder: '#664400',
+        tabInactive: '#442200',
+    },
+    light: {
+        bg: '#f5f0e8', bgCard: '#fffdf5', bgDeep: '#ece6d8',
+        border: '#c8a870', borderBright: '#a07840',
+        text: '#5a3a10', textDim: '#9a7a50', textBright: '#3a1a00',
+        accent: '#cc6600', gold: '#aa8800',
+        resultBg: '#fefcf5', resultBorder: '#c8a870',
+        tabInactive: '#b09060',
+    },
 };
+let _theme = 'dark';
+function C() { return THEMES[_theme]; }
+function saveTheme(t) { _theme = t; const s=getSettings(); s.theme=t; save(); }
 
 const STAT_META = {
     charm:    { label: '🌹', color: '#ff44aa' },
@@ -31,6 +46,7 @@ const defaultSettings = {
     records: [],
     selectedProfileName: null,
     maxTokens: 4000,
+    theme: 'dark',
 };
 
 // ─── 상태 ──────────────────────────────────
@@ -235,19 +251,19 @@ function showLoading(stepMsg) {
         el.innerHTML = `
             <div style="position:relative;width:28px;height:28px;flex-shrink:0">
                 <svg viewBox="0 0 60 60" style="width:28px;height:28px;animation:ba-spin 1.2s linear infinite">
-                    <circle cx="30" cy="30" r="24" fill="none" stroke="${C.border}" stroke-width="4"/>
-                    <circle cx="30" cy="30" r="24" fill="none" stroke="${C.accent}" stroke-width="4"
+                    <circle cx="30" cy="30" r="24" fill="none" stroke="${C().border}" stroke-width="4"/>
+                    <circle cx="30" cy="30" r="24" fill="none" stroke="${C().accent}" stroke-width="4"
                         stroke-dasharray="40 110" stroke-linecap="round"/>
                 </svg>
                 <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px">⚔️</div>
             </div>
             <div style="flex:1">
-                <div id="ba-loading-msg" style="font-size:10px;color:${C.accent};font-family:'Press Start 2P',monospace;letter-spacing:1px">${LOADING_STEPS[0]}</div>
+                <div id="ba-loading-msg" style="font-size:10px;color:${C().accent};font-family:'Press Start 2P',monospace;letter-spacing:1px">${LOADING_STEPS[0]}</div>
                 <div style="display:flex;gap:3px;margin-top:5px">
                     <div class="ba-dot"></div><div class="ba-dot"></div><div class="ba-dot"></div>
                 </div>
             </div>`;
-        el.style.cssText = `position:sticky;bottom:0;left:0;right:0;background:${C.bg}ee;border-top:1px solid ${C.border};z-index:10;display:flex;align-items:center;gap:12px;padding:10px 14px;backdrop-filter:blur(4px)`;
+        el.style.cssText = `position:sticky;bottom:0;left:0;right:0;background:${C().bg}ee;border-top:1px solid ${C().border};z-index:10;display:flex;align-items:center;gap:12px;padding:10px 14px;backdrop-filter:blur(4px)`;
         document.getElementById('ba-content')?.appendChild(el);
     }
     const m = document.getElementById('ba-loading-msg');
@@ -345,8 +361,8 @@ async function runBattle(condition) {
                 if (f?.name === winner) {
                     const ring = slot.querySelector('.ba-slot-ring');
                     if (ring) {
-                        ring.style.borderColor = C.gold;
-                        ring.style.boxShadow   = `0 0 18px ${C.gold}cc`;
+                        ring.style.borderColor = C().gold;
+                        ring.style.boxShadow   = `0 0 18px ${C().gold}cc`;
                     }
                 }
             });
@@ -371,17 +387,17 @@ function openResultPanel(record) {
     const wm = winnerMatch(record.resultText);
 
     panel.innerHTML = `
-        <div id="ba-result-drag" style="background:linear-gradient(180deg,#1a0800,#0d0400);border-bottom:2px solid ${C.border};padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:move;flex-shrink:0;user-select:none">
+        <div id="ba-result-drag" style="background:linear-gradient(180deg,#1a0800,#0d0400);border-bottom:2px solid ${C().border};padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:move;flex-shrink:0;user-select:none">
             <span style="font-size:14px">📜</span>
-            <div style="flex:1;font-family:'Press Start 2P',monospace;font-size:11px;color:${C.accent};letter-spacing:2px">BATTLE REPORT</div>
-            <button id="ba-result-close" style="background:none;border:1px solid ${C.border};border-radius:2px;color:${C.textDim};cursor:pointer;font-size:10px;padding:2px 7px;font-family:monospace">✕</button>
+            <div style="flex:1;font-family:'Press Start 2P',monospace;font-size:11px;color:${C().accent};letter-spacing:2px">BATTLE REPORT</div>
+            <button id="ba-result-close" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:10px;padding:2px 7px;font-family:monospace">✕</button>
         </div>
-        <div id="ba-result-body">
+        <div id="ba-result-body" style="flex:1;overflow-y:auto;overflow-x:hidden;">
             ${formatResult(record)}
         </div>
-        <div id="ba-result-resize" style="position:absolute;bottom:0;right:0;width:20px;height:20px;cursor:se-resize;display:flex;align-items:flex-end;justify-content:flex-end;padding:3px;opacity:0.4;font-size:12px;user-select:none;color:${C.border}">⇲</div>`;
+        <div id="ba-result-resize" style="position:absolute;bottom:0;right:0;width:20px;height:20px;cursor:se-resize;display:flex;align-items:flex-end;justify-content:flex-end;padding:3px;opacity:0.4;font-size:12px;user-select:none;color:${C().border}">⇲</div>`;
 
-    panel.style.cssText = `position:fixed;top:80px;left:20px;width:min(500px,90vw);height:80vh;background:#050300;border:2px solid ${C.border};border-radius:4px;box-shadow:4px 0 30px #ff440022,0 4px 30px #cc440033;z-index:10100;display:flex;flex-direction:column;resize:both;overflow:hidden;min-width:300px;min-height:300px`;
+    panel.style.cssText = `position:fixed;top:80px;left:20px;width:min(500px,90vw);height:80vh;background:#050300;border:2px solid ${C().border};border-radius:4px;box-shadow:4px 0 30px #ff440022,0 4px 30px #cc440033;z-index:10100;display:flex;flex-direction:column;resize:both;overflow:hidden;min-width:300px;min-height:300px`;
 
     document.body.appendChild(panel);
 
@@ -414,21 +430,82 @@ function formatResult(record) {
         const m  = text.match(rx);
         const content = m ? m[1].trim() : '';
         body += `<div style="margin-bottom:22px">
-            <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:${C.accent};letter-spacing:2px;border-bottom:1px solid ${C.border};padding-bottom:5px;margin-bottom:10px">${sec.icon} ${sec.key}</div>
-            <div style="color:${C.text};font-size:12px;line-height:2;white-space:pre-wrap;word-break:break-word">${esc(content||'—')}</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:11px;color:${C().accent};letter-spacing:2px;border-bottom:1px solid ${C().border};padding-bottom:5px;margin-bottom:10px">${sec.icon} ${sec.key}</div>
+            <div style="color:${C().text};font-size:12px;line-height:2;white-space:pre-wrap;word-break:break-word">${esc(content||'—')}</div>
         </div>`;
     }
 
-    const resultBodyStyle = `flex:1;overflow-y:auto;padding:16px 18px;font-family:'Noto Serif KR','Apple SD Gothic Neo',system-ui,sans-serif;font-size:12px;color:${C.text};line-height:2;word-break:break-word`;
+    const resultBodyStyle = `padding:16px 18px;font-family:'Noto Serif KR','Apple SD Gothic Neo',system-ui,sans-serif;font-size:13px;color:${C().text};line-height:2;word-break:break-word`;
 
     return `
         <div style="${resultBodyStyle}">
-            <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:${C.textDim};margin-bottom:14px;letter-spacing:1px;line-height:2.5">${esc(fighterNames)}<br>${esc(record.condition.slice(0,60))}</div>
-            <div style="font-family:'Press Start 2P',monospace;font-size:13px;color:${C.gold};text-align:center;padding:14px;border:2px solid ${C.gold}55;border-radius:2px;background:#1a0800;letter-spacing:2px;text-shadow:0 0 12px ${C.gold}88;margin-bottom:20px;animation:ba-winner-glow 2s ease-in-out infinite">
+            <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:${C().textDim};margin-bottom:14px;letter-spacing:1px;line-height:2.5">${esc(fighterNames)}<br>${esc(record.condition.slice(0,60))}</div>
+            <div style="font-family:'Press Start 2P',monospace;font-size:13px;color:${C().gold};text-align:center;padding:14px;border:2px solid ${C().gold}55;border-radius:2px;background:#1a0800;letter-spacing:2px;text-shadow:0 0 12px ${C().gold}88;margin-bottom:20px;animation:ba-winner-glow 2s ease-in-out infinite">
                 🏆 WINNER: ${esc(winner)} (${winRate}%)
             </div>
             ${body}
         </div>`;
+}
+
+
+// ═══════════════════════════════════════════
+// 전투 프로필 미리보기
+// ═══════════════════════════════════════════
+async function showCombatProfile(char) {
+    // 기존 창 닫기
+    document.getElementById('ba-combat-profile-panel')?.remove();
+
+    const p   = char.parsed||{};
+    const raw = p.raw||[p.appearance,p.personality,p.traits].filter(Boolean).join('\n');
+
+    // 간단 버전 프롬프트 (전투 특성만, 짧게)
+    const prompt = `Character: ${char.name} (${char.gender==='female'?'F':'M'}, ${p.age||'?'}, ${p.job||'?'})
+Stats: charm=${char.stats?.charm||50} presence=${char.stats?.presence||50} desire=${char.stats?.desire||50} wit=${char.stats?.wit||50} aura=${char.stats?.aura||50}
+Sheet summary: ${raw.slice(0,800)}
+
+Extract ONLY combat-relevant facts. Return in Korean, plain text, no JSON:
+【종족/신체】 species/build/age-peak in 1 sentence
+【직업 전투해석】 how their job translates to combat ability in 1 sentence
+【전투 경험】 estimated real combat experience in 1 sentence
+【주요 기술】 specific combat skills, weapons, powers in 1 sentence
+【심리】 combat psychology in 1 sentence
+【강점 한줄】 biggest advantage
+【약점 한줄】 biggest weakness`;
+
+    const panel = document.createElement('div');
+    panel.id = 'ba-combat-profile-panel';
+    panel.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(400px,90vw);max-height:80vh;background:${C().bgCard};border:2px solid ${C().borderBright};border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,0.5);z-index:10300;display:flex;flex-direction:column;overflow:hidden`;
+    panel.innerHTML = `
+        <div style="background:${C().bg};border-bottom:1px solid ${C().border};padding:10px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span style="font-size:14px">⚔️</span>
+            <div style="flex:1;font-family:'Press Start 2P',monospace;font-size:9px;color:${C().accent};letter-spacing:1px">${esc(char.name)} — 전투 프로필</div>
+            <button id="ba-cp-close" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:10px;padding:2px 6px;font-family:monospace">✕</button>
+        </div>
+        <div id="ba-cp-body" style="flex:1;overflow-y:auto;padding:14px 16px;font-family:system-ui,sans-serif;font-size:13px;color:${C().text};line-height:1.9">
+            <div style="display:flex;gap:4px;align-items:center;color:${C().textDim};font-size:11px">
+                <span>분석 중</span>
+                <span class="ba-dot"></span><span class="ba-dot"></span><span class="ba-dot"></span>
+            </div>
+        </div>`;
+    document.body.appendChild(panel);
+    document.getElementById('ba-cp-close')?.addEventListener('click',()=>panel.remove());
+
+    try {
+        const result = await callAI(prompt,
+            'You are a combat analyst. Extract only combat-relevant information, concisely. Korean output only.');
+        const body = document.getElementById('ba-cp-body');
+        if (body) {
+            // 섹션별 포맷
+            const lines = result.split('\n').filter(l=>l.trim());
+            body.innerHTML = lines.map(line=>{
+                const isHeader = line.startsWith('【');
+                return `<div style="margin-bottom:${isHeader?'2px':'10px'};${isHeader?`color:${C().accent};font-weight:700;font-size:11px;margin-top:10px`:`color:${C().text};font-size:13px;padding-left:8px`}">${esc(line)}</div>`;
+            }).join('');
+        }
+    } catch(e) {
+        const body = document.getElementById('ba-cp-body');
+        if (body) body.innerHTML = `<div style="color:#ff4444;font-size:12px">분석 실패: ${esc(e.message)}</div>`;
+    }
 }
 
 // ═══════════════════════════════════════════
@@ -449,25 +526,25 @@ function showConditionModal() {
     modal.style.cssText = 'position:fixed;inset:0;background:#00000099;z-index:10200;display:flex;align-items:center;justify-content:center';
 
     modal.innerHTML = `
-        <div style="background:${C.bgCard};border:2px solid ${C.borderBright};border-radius:4px;padding:20px;width:min(400px,92vw);box-shadow:0 0 40px #ff440033;font-family:'Press Start 2P',monospace">
-            <div style="font-size:12px;color:${C.accent};letter-spacing:2px;margin-bottom:4px;text-align:center">⚔️ BATTLE CONDITION</div>
-            <div style="font-size:13px;color:${C.textDim};margin-bottom:12px;font-family:system-ui;text-align:center">어떤 상황에서 싸우나요?</div>
+        <div style="background:${C().bgCard};border:2px solid ${C().borderBright};border-radius:4px;padding:20px;width:min(400px,92vw);box-shadow:0 0 40px #ff440033;font-family:'Press Start 2P',monospace">
+            <div style="font-size:12px;color:${C().accent};letter-spacing:2px;margin-bottom:4px;text-align:center">⚔️ BATTLE CONDITION</div>
+            <div style="font-size:13px;color:${C().textDim};margin-bottom:12px;font-family:system-ui;text-align:center">어떤 상황에서 싸우나요?</div>
             <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">
-                ${CHIPS.map(c=>`<div class="ba-chip" data-v="${esc(c)}" style="font-size:13px;font-family:system-ui;padding:4px 8px;background:#1a0800;border:1px solid ${C.border};border-radius:2px;color:${C.text};cursor:pointer;transition:all 0.1s">${esc(c)}</div>`).join('')}
+                ${CHIPS.map(c=>`<div class="ba-chip" data-v="${esc(c)}" style="font-size:13px;font-family:system-ui;padding:4px 8px;background:#1a0800;border:1px solid ${C().border};border-radius:2px;color:${C().text};cursor:pointer;transition:all 0.1s">${esc(c)}</div>`).join('')}
             </div>
             <textarea id="ba-cond-ta" placeholder="예: 좁은 골목 야간 칼싸움. 양쪽 단도 1자루.&#10;예: 법정 최후변론 대결.&#10;예: 전면전 — 각자 100명 병력 지휘.&#10;(비워두면 기본 대결)" rows="4"
-                style="width:100%;background:#060400;border:1px solid ${C.border};border-radius:2px;padding:10px;color:${C.text};font-size:11px;font-family:'Noto Serif KR',system-ui;line-height:1.8;resize:vertical;outline:none;box-sizing:border-box;min-height:90px"></textarea>
+                style="width:100%;background:#060400;border:1px solid ${C().border};border-radius:2px;padding:10px;color:${C().text};font-size:11px;font-family:'Noto Serif KR',system-ui;line-height:1.8;resize:vertical;outline:none;box-sizing:border-box;min-height:90px"></textarea>
             <div style="display:flex;gap:8px;margin-top:12px">
-                <button id="ba-cond-cancel" style="flex:1;padding:10px;background:none;border:1px solid ${C.border};border-radius:2px;color:${C.textDim};cursor:pointer;font-family:'Press Start 2P',monospace;font-size:11px">CANCEL</button>
-                <button id="ba-cond-go" style="flex:1;padding:10px;background:linear-gradient(180deg,#331500,#1a0800);border:2px solid ${C.borderBright};border-radius:2px;color:${C.accent};cursor:pointer;font-family:'Press Start 2P',monospace;font-size:11px;text-shadow:0 0 6px ${C.accent}66">⚔️ FIGHT</button>
+                <button id="ba-cond-cancel" style="flex:1;padding:10px;background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-family:'Press Start 2P',monospace;font-size:11px">CANCEL</button>
+                <button id="ba-cond-go" style="flex:1;padding:10px;background:linear-gradient(180deg,#331500,#1a0800);border:2px solid ${C().borderBright};border-radius:2px;color:${C().accent};cursor:pointer;font-family:'Press Start 2P',monospace;font-size:11px;text-shadow:0 0 6px ${C().accent}66">⚔️ FIGHT</button>
             </div>
         </div>`;
 
     document.body.appendChild(modal);
 
     modal.querySelectorAll('.ba-chip').forEach(chip => {
-        chip.addEventListener('mouseenter', ()=>{ chip.style.borderColor=C.accent; chip.style.color=C.accent; });
-        chip.addEventListener('mouseleave', ()=>{ chip.style.borderColor=C.border; chip.style.color=C.text; });
+        chip.addEventListener('mouseenter', ()=>{ chip.style.borderColor=C().accent; chip.style.color=C().accent; });
+        chip.addEventListener('mouseleave', ()=>{ chip.style.borderColor=C().border; chip.style.color=C().text; });
         chip.addEventListener('click', () => {
             const ta = document.getElementById('ba-cond-ta');
             if (ta) ta.value = ta.value ? ta.value+', '+chip.dataset.v : chip.dataset.v;
@@ -486,12 +563,12 @@ function showConditionModal() {
 // ═══════════════════════════════════════════
 // 아레나 원형 위치
 // ═══════════════════════════════════════════
-function getPositions(n, r=88) {
-    if (n===1) return [{x:120,y:120}];
-    if (n===2) return [{x:120-r,y:120},{x:120+r,y:120}];
+function getPositions(n, r=70) {
+    if (n===1) return [{x:100,y:100}];
+    if (n===2) return [{x:100-r,y:100},{x:100+r,y:100}];
     return Array.from({length:n},(_,i)=>{
         const a=(i*2*Math.PI/n)-Math.PI/2;
-        return {x:Math.round(120+r*Math.cos(a)),y:Math.round(120+r*Math.sin(a))};
+        return {x:Math.round(100+r*Math.cos(a)),y:Math.round(100+r*Math.sin(a))};
     });
 }
 
@@ -516,7 +593,7 @@ function renderArenaTab() {
     // 파이터 슬롯 DOM
     const slots = fighters.length===0
         ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
-               <div style="font-size:10px;color:${C.textDim};letter-spacing:2px;text-align:center;line-height:3">NO FIGHTERS<br>SELECTED</div>
+               <div style="font-size:10px;color:${C().textDim};letter-spacing:2px;text-align:center;line-height:3">NO FIGHTERS<br>SELECTED</div>
            </div>`
         : getPositions(fighters.length).map((pos,i)=>{
             const f   = fighters[i];
@@ -530,24 +607,24 @@ function renderArenaTab() {
             return `<div class="ba-fighter-slot" data-idx="${i}"
                 style="position:absolute;left:${pos.x}px;top:${pos.y}px;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;z-index:2">
                 <div class="ba-slot-ring" style="width:54px;height:54px;border-radius:50%;border:2px solid ${gc};overflow:hidden;background:#0d0600;box-shadow:0 0 8px ${gc}66;transition:all 0.2s">${inner}</div>
-                <div style="font-size:13px;color:${C.accent};letter-spacing:1px;text-align:center;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</div>
-                <div style="font-size:13px;color:${C.textDim};font-family:'Press Start 2P',monospace">${getTotal(f)}</div>
+                <div style="font-size:13px;color:${C().accent};letter-spacing:1px;text-align:center;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</div>
+                <div style="font-size:13px;color:${C().textDim};font-family:'Press Start 2P',monospace">${getTotal(f)}</div>
             </div>`;
           }).join('');
 
     // 파워 배지
     const badges = canFight
         ? `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;justify-content:center">
-            ${fighters.map(f=>`<div style="display:flex;align-items:center;gap:4px;background:${C.bgCard};border:1px solid ${C.border};border-radius:2px;padding:4px 8px">
-                <span style="font-size:11px;color:${C.textBright};font-family:monospace">${esc(f.name)}</span>
-                <span style="font-size:11px;color:${C.accent};font-family:'Press Start 2P',monospace">${getTotal(f)}</span>
+            ${fighters.map(f=>`<div style="display:flex;align-items:center;gap:4px;background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;padding:4px 8px">
+                <span style="font-size:11px;color:${C().textBright};font-family:monospace">${esc(f.name)}</span>
+                <span style="font-size:11px;color:${C().accent};font-family:'Press Start 2P',monospace">${getTotal(f)}</span>
             </div>`).join('')}
            </div>`
         : '';
 
     // 캐릭터 카드 목록
     const cards = roster.length===0
-        ? `<div style="text-align:center;color:${C.textDim};font-size:11px;padding:20px 0;letter-spacing:1px;line-height:3">NO FIGHTERS IN ROSTER<br><span style="font-size:13px;color:#331500">Add characters via Scouter first</span></div>`
+        ? `<div style="text-align:center;color:${C().textDim};font-size:11px;padding:20px 0;letter-spacing:1px;line-height:3">NO FIGHTERS IN ROSTER<br><span style="font-size:13px;color:#331500">Add characters via Scouter first</span></div>`
         : roster.map(char=>{
             const sel = !!fighters.find(f=>f.id===char.id);
             const url = resolveAvatarUrl(char.name);
@@ -559,22 +636,23 @@ function renderArenaTab() {
                 : ini;
             const statBars = Object.entries(char.stats||{}).map(([k,v])=>`
                 <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-                    <div style="font-size:13px;width:10px;flex-shrink:0;color:${C.text}">${STAT_META[k]?.label||k}</div>
+                    <div style="font-size:13px;width:10px;flex-shrink:0;color:${C().text}">${STAT_META[k]?.label||k}</div>
                     <div style="flex:1;height:4px;background:#1a0800;border-radius:1px;overflow:hidden;border:1px solid #331500">
-                        <div style="width:${v}%;height:100%;background:${STAT_META[k]?.color||C.accent};border-radius:1px;transition:width 0.6s"></div>
+                        <div style="width:${v}%;height:100%;background:${STAT_META[k]?.color||C().accent};border-radius:1px;transition:width 0.6s"></div>
                     </div>
-                    <div style="font-size:13px;width:18px;text-align:right;color:${C.accent};flex-shrink:0">${v}</div>
+                    <div style="font-size:13px;width:18px;text-align:right;color:${C().accent};flex-shrink:0">${v}</div>
                 </div>`).join('');
             return `<div class="ba-char-card" data-id="${char.id}"
-                style="background:${sel?'#1a0800':C.bgCard};border:1px solid ${sel?C.accent:C.border};border-radius:2px;padding:8px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;margin-bottom:5px;transition:all 0.15s;${sel?`box-shadow:0 0 8px ${C.accent}33`:''}">
+                style="background:${sel?'#1a0800':C().bgCard};border:1px solid ${sel?C().accent:C().border};border-radius:2px;padding:8px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;margin-bottom:5px;transition:all 0.15s;${sel?`box-shadow:0 0 8px ${C().accent}33`:''}">
                 <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;border:1px solid ${gc};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;background:radial-gradient(circle at 35% 35%,hsl(${hue},30%,22%),hsl(${hue},20%,10%));color:hsl(${hue},50%,70%);font-family:monospace">${avInner}</div>
                 <div style="flex:1;min-width:0">
-                    <div style="font-size:12px;font-weight:700;color:${sel?C.textBright:C.text};margin-bottom:5px;font-family:'Press Start 2P',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(char.name)}</div>
+                    <div style="font-size:12px;font-weight:700;color:${sel?C().textBright:C().text};margin-bottom:5px;font-family:'Press Start 2P',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(char.name)}</div>
                     ${statBars}
                 </div>
-                <div style="text-align:right;flex-shrink:0">
-                    <div style="font-size:14px;font-weight:900;color:${sel?C.accent:C.textDim};font-family:'Press Start 2P',monospace">${getTotal(char)}</div>
-                    ${sel?`<div style="font-size:13px;color:${C.accent};margin-top:3px;letter-spacing:1px">SELECTED</div>`:''}
+                <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                    <div style="font-size:14px;font-weight:900;color:${sel?C().accent:C().textDim};font-family:'Press Start 2P',monospace">${getTotal(char)}</div>
+                    ${sel?`<div style="font-size:10px;color:${C().accent};letter-spacing:1px">✓</div>`:''}
+                    <button class="ba-combat-profile-btn" data-id="${char.id}" style="background:none;border:1px solid ${C().border};border-radius:2px;padding:2px 6px;cursor:pointer;color:${C().textDim};font-size:10px;line-height:1.4" title="전투 프로필 보기">⚔️</button>
                 </div>
             </div>`;
         }).join('');
@@ -582,14 +660,14 @@ function renderArenaTab() {
     content.innerHTML = `
         <!-- 아레나 원형 -->
         <div style="padding:14px 14px 8px;display:flex;flex-direction:column;align-items:center">
-            <div style="position:relative;width:240px;height:240px;margin:0 auto;flex-shrink:0">
-                <svg viewBox="0 0 240 240" style="position:absolute;inset:0;width:100%;height:100%">
-                    <circle cx="120" cy="120" r="110" fill="#030200" stroke="#221100" stroke-width="1"/>
-                    <circle cx="120" cy="120" r="108" fill="none" stroke="#442200" stroke-width="2" stroke-dasharray="8 4" class="ba-pulse-ring"/>
-                    <circle cx="120" cy="120" r="96" fill="none" stroke="#331500" stroke-width="1"/>
-                    <line x1="120" y1="28" x2="120" y2="212" stroke="#221100" stroke-width="1" opacity="0.4"/>
-                    <line x1="28" y1="120" x2="212" y2="120" stroke="#221100" stroke-width="1" opacity="0.4"/>
-                    <text x="120" y="126" text-anchor="middle" fill="#442200" font-size="18" font-family="monospace">⚔️</text>
+            <div style="position:relative;width:200px;height:200px;margin:0 auto;flex-shrink:0">
+                <svg viewBox="0 0 200 200" style="position:absolute;inset:0;width:100%;height:100%">
+                    <circle cx="100" cy="100" r="92" fill="#030200" stroke="#221100" stroke-width="1"/>
+                    <circle cx="100" cy="100" r="90" fill="none" stroke="#442200" stroke-width="2" stroke-dasharray="8 4" class="ba-pulse-ring"/>
+                    <circle cx="100" cy="100" r="80" fill="none" stroke="#331500" stroke-width="1"/>
+                    <line x1="100" y1="10" x2="100" y2="190" stroke="#221100" stroke-width="1" opacity="0.4"/>
+                    <line x1="10" y1="100" x2="190" y2="100" stroke="#221100" stroke-width="1" opacity="0.4"/>
+                    <text x="100" y="106" text-anchor="middle" fill="#442200" font-size="18" font-family="monospace">⚔️</text>
                     ${lines}
                 </svg>
                 ${slots}
@@ -599,9 +677,9 @@ function renderArenaTab() {
 
         <!-- 구분선 -->
         <div style="display:flex;align-items:center;gap:8px;margin:12px 14px 10px">
-            <div style="flex:1;height:1px;background:linear-gradient(90deg,${C.accent}44,transparent)"></div>
-            <div style="font-size:10px;color:${C.borderBright};letter-spacing:2px;font-family:'Press Start 2P',monospace">SELECT FIGHTERS</div>
-            <div style="flex:1;height:1px;background:linear-gradient(270deg,${C.accent}44,transparent)"></div>
+            <div style="flex:1;height:1px;background:linear-gradient(90deg,${C().accent}44,transparent)"></div>
+            <div style="font-size:10px;color:${C().borderBright};letter-spacing:2px;font-family:'Press Start 2P',monospace">SELECT FIGHTERS</div>
+            <div style="flex:1;height:1px;background:linear-gradient(270deg,${C().accent}44,transparent)"></div>
         </div>
 
         <!-- 캐릭터 목록 -->
@@ -609,7 +687,7 @@ function renderArenaTab() {
 
         <!-- 배틀 버튼 -->
         <button id="ba-fight-btn" ${canFight?'':'disabled'}
-            style="display:block;width:calc(100% - 28px);margin:0 14px 14px;padding:12px;background:linear-gradient(180deg,#331500,#1a0800);border:2px solid ${canFight?C.borderBright:C.border};border-radius:2px;color:${canFight?C.accent:C.textDim};font-family:'Press Start 2P',monospace;font-size:13px;letter-spacing:2px;cursor:${canFight?'pointer':'not-allowed'};text-shadow:${canFight?`0 0 8px ${C.accent}88`:'none'};box-shadow:${canFight?`0 0 12px ${C.accent}33`:'none'};opacity:${canFight?1:0.4};transition:all 0.15s">
+            style="display:block;width:calc(100% - 28px);margin:0 14px 14px;padding:12px;background:linear-gradient(180deg,#331500,#1a0800);border:2px solid ${canFight?C().borderBright:C().border};border-radius:2px;color:${canFight?C().accent:C().textDim};font-family:'Press Start 2P',monospace;font-size:13px;letter-spacing:2px;cursor:${canFight?'pointer':'not-allowed'};text-shadow:${canFight?`0 0 8px ${C().accent}88`:'none'};box-shadow:${canFight?`0 0 12px ${C().accent}33`:'none'};opacity:${canFight?1:0.4};transition:all 0.15s">
             ${canFight?`⚔️  FIGHT  (${fighters.length} FIGHTERS)`:fighters.length===0?'SELECT 2+ FIGHTERS':`SELECT ${2-fighters.length} MORE`}
         </button>`;
 
@@ -623,6 +701,15 @@ function renderArenaTab() {
             if (idx>=0) state.selectedFighters.splice(idx,1);
             else state.selectedFighters.push(char);
             renderArenaTab();
+        });
+    });
+
+    // 전투 프로필 버튼
+    content.querySelectorAll('.ba-combat-profile-btn').forEach(btn=>{
+        btn.addEventListener('click', e=>{
+            e.stopPropagation();
+            const char = getRoster().find(c=>c.id===btn.dataset.id);
+            if (char) showCombatProfile(char);
         });
     });
 
@@ -642,7 +729,7 @@ function renderRecordsTab() {
 
     if (!records.length) {
         content.innerHTML = `<div style="text-align:center;padding:40px 14px;font-family:'Press Start 2P',monospace">
-            <div style="font-size:12px;color:${C.textDim};letter-spacing:2px;line-height:3">NO BATTLES<br>RECORDED</div>
+            <div style="font-size:12px;color:${C().textDim};letter-spacing:2px;line-height:3">NO BATTLES<br>RECORDED</div>
         </div>`;
         return;
     }
@@ -650,16 +737,16 @@ function renderRecordsTab() {
     content.innerHTML = `<div style="padding:14px">
         ${records.map(r=>`
         <div class="ba-rec" data-id="${r.id}"
-            style="background:${C.bgCard};border:1px solid ${C.border};border-left:3px solid ${C.accent};border-radius:2px;padding:9px 11px;cursor:pointer;margin-bottom:6px;transition:all 0.15s;display:flex;align-items:center;gap:8px">
+            style="background:${C().bgCard};border:1px solid ${C().border};border-left:3px solid ${C().accent};border-radius:2px;padding:9px 11px;cursor:pointer;margin-bottom:6px;transition:all 0.15s;display:flex;align-items:center;gap:8px">
             <div style="flex:1;min-width:0">
-                <div style="font-size:10px;color:${C.gold};font-family:'Press Start 2P',monospace;letter-spacing:1px;margin-bottom:3px">🏆 ${esc(r.winner)}${r.winRate?` (${r.winRate}%)`:''}
+                <div style="font-size:10px;color:${C().gold};font-family:'Press Start 2P',monospace;letter-spacing:1px;margin-bottom:3px">🏆 ${esc(r.winner)}${r.winRate?` (${r.winRate}%)`:''}
                 </div>
-                <div style="font-size:10px;color:${C.textDim};margin-top:2px">${esc(r.fighters.map(f=>f.name).join(' VS '))}</div>
+                <div style="font-size:10px;color:${C().textDim};margin-top:2px">${esc(r.fighters.map(f=>f.name).join(' VS '))}</div>
                 <div style="font-size:13px;color:#442200;margin-top:2px">${esc((r.condition||'').slice(0,40))}${(r.condition||'').length>40?'...':''}</div>
             </div>
             <div style="text-align:right;flex-shrink:0">
-                <div style="font-size:13px;color:${C.textDim}">${esc(r.createdAt||'')}</div>
-                <button class="ba-del" data-id="${r.id}" style="margin-top:5px;background:none;border:1px solid ${C.border};border-radius:2px;padding:2px 6px;cursor:pointer;color:${C.textDim};font-size:13px">🗑</button>
+                <div style="font-size:13px;color:${C().textDim}">${esc(r.createdAt||'')}</div>
+                <button class="ba-del" data-id="${r.id}" style="margin-top:5px;background:none;border:1px solid ${C().border};border-radius:2px;padding:2px 6px;cursor:pointer;color:${C().textDim};font-size:13px">🗑</button>
             </div>
         </div>`).join('')}
     </div>`;
@@ -693,24 +780,24 @@ function renderSettingsTab() {
     const saved    = s.selectedProfileName || '';
 
     content.innerHTML = `<div style="padding:16px;font-family:'Press Start 2P',monospace">
-        <div style="font-size:10px;color:${C.borderBright};letter-spacing:2px;border-bottom:1px solid ${C.border};padding-bottom:6px;margin-bottom:12px">AI CONFIG</div>
+        <div style="font-size:10px;color:${C().borderBright};letter-spacing:2px;border-bottom:1px solid ${C().border};padding-bottom:6px;margin-bottom:12px">AI CONFIG</div>
         <div style="margin-bottom:12px">
-            <div style="font-size:10px;color:${C.text};margin-bottom:6px;letter-spacing:1px">CONNECTION PROFILE</div>
-            <select id="ba-prof-sel" style="background:${C.bgCard};border:1px solid ${C.border};border-radius:2px;color:${C.text};font-size:11px;padding:6px 8px;font-family:system-ui;outline:none;width:100%">
+            <div style="font-size:10px;color:${C().text};margin-bottom:6px;letter-spacing:1px">CONNECTION PROFILE</div>
+            <select id="ba-prof-sel" style="background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;color:${C().text};font-size:11px;padding:6px 8px;font-family:system-ui;outline:none;width:100%">
                 <option value="">현재 연결 그대로</option>
                 ${profiles.map(p=>`<option value="${esc(p.name)}" ${p.name===saved?'selected':''}>${esc(p.name)}</option>`).join('')}
             </select>
         </div>
         <div style="margin-bottom:12px">
-            <div style="font-size:10px;color:${C.text};margin-bottom:6px;letter-spacing:1px">MAX TOKENS</div>
+            <div style="font-size:10px;color:${C().text};margin-bottom:6px;letter-spacing:1px">MAX TOKENS</div>
             <input id="ba-tok" type="number" min="500" max="16000" step="500" value="${s.maxTokens||4000}"
-                style="background:${C.bgCard};border:1px solid ${C.border};border-radius:2px;color:${C.text};font-size:11px;padding:6px 8px;font-family:system-ui;outline:none;width:100%;box-sizing:border-box">
+                style="background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;color:${C().text};font-size:11px;padding:6px 8px;font-family:system-ui;outline:none;width:100%;box-sizing:border-box">
         </div>
-        <div style="font-size:13px;color:${C.textDim};margin-bottom:6px;letter-spacing:1px;line-height:2">NOTE: Battle uses 2 calls (profile per fighter + 1 final). Token cost = fighters × profile + final.</div>
-        <div style="border-top:1px solid ${C.border};padding-top:12px;margin-top:12px">
+        <div style="font-size:13px;color:${C().textDim};margin-bottom:6px;letter-spacing:1px;line-height:2">NOTE: Battle uses 2 calls (profile per fighter + 1 final). Token cost = fighters × profile + final.</div>
+        <div style="border-top:1px solid ${C().border};padding-top:12px;margin-top:12px">
             <button id="ba-clear-recs" style="width:100%;background:none;border:1px solid #441100;border-radius:2px;padding:8px;cursor:pointer;color:#882200;font-size:10px;font-family:'Press Start 2P',monospace;letter-spacing:1px">🗑 CLEAR ALL RECORDS</button>
         </div>
-        <div style="margin-top:18px;font-size:13px;color:${C.textDim};letter-spacing:1px;line-height:2.5">
+        <div style="margin-top:18px;font-size:13px;color:${C().textDim};letter-spacing:1px;line-height:2.5">
             챗틀로얄 v1.0 · by 봉봉<br>
             Reads Scouter roster (read-only)<br>
             Records stored in chatl_royal settings
@@ -788,19 +875,20 @@ function openPanel() {
 
     const panel = document.createElement('div');
     panel.id='ba-float';
-    panel.style.cssText=`position:fixed;top:60px;right:20px;width:min(460px,95vw);height:82vh;background:${C.bg};border:2px solid #884400;border-radius:4px;box-shadow:-4px 0 30px #ff440022,0 4px 30px #cc440033;z-index:9998;display:flex;flex-direction:column;resize:both;overflow:hidden;min-width:320px;min-height:400px;font-family:'Press Start 2P',monospace`;
+    panel.style.cssText=`position:fixed;top:60px;right:20px;width:min(460px,95vw);height:82vh;background:${C().bg};border:2px solid ${C().borderBright};border-radius:4px;box-shadow:-4px 0 30px #ff440022,0 4px 30px #cc440033;z-index:9998;display:flex;flex-direction:column;resize:both;overflow:hidden;min-width:320px;min-height:400px;font-family:'Press Start 2P',monospace`;
 
     panel.innerHTML = `
-        <div id="ba-drag-handle" style="background:linear-gradient(180deg,#1a0800,#0d0400);border-bottom:2px solid #884400;padding:8px 12px;display:flex;align-items:center;gap:10px;cursor:move;flex-shrink:0;user-select:none">
+        <div id="ba-drag-handle" style="background:${C().bg};border-bottom:2px solid ${C().border};padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:move;flex-shrink:0;user-select:none">
             <span style="font-size:16px;filter:drop-shadow(0 0 6px #ff440088)">⚔️</span>
             <div style="flex:1">
                 <div style="font-size:13px;font-weight:900;letter-spacing:2px;background:linear-gradient(90deg,#ff6600,#ffaa00,#ff6600);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:ba-shimmer 2s linear infinite" class="ba-flicker">챗틀로얄</div>
-                <div style="font-size:13px;color:#442200;letter-spacing:1px;margin-top:2px">COLOSSEUM SYSTEM v1.0</div>
+                <div style="font-size:8px;color:${C().textDim};letter-spacing:1px;margin-top:1px">COLOSSEUM v2.0</div>
             </div>
-            <button id="ba-close" style="background:none;border:1px solid ${C.border};border-radius:2px;color:${C.textDim};cursor:pointer;font-size:11px;padding:2px 7px;font-family:monospace">✕</button>
+            <button id="ba-theme-btn" title="테마 전환" style="background:none;border:1px solid ${C().border};border-radius:2px;cursor:pointer;font-size:13px;padding:2px 6px;color:${C().textDim};line-height:1">${_theme==='dark'?'☀️':'🌙'}</button>
+            <button id="ba-close" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:11px;padding:2px 7px;font-family:monospace;line-height:1">✕</button>
         </div>
-        <div id="ba-tabs" style="display:flex;background:linear-gradient(180deg,#0d0600,#060400);border-bottom:1px solid #331500;flex-shrink:0">
-            <button class="ba-tab active" data-tab="arena" style="flex:1;background:none;border:none;border-bottom:2px solid ${C.accent};padding:8px 0;cursor:pointer;color:${C.accent};font-family:'Press Start 2P',monospace;font-size:10px;letter-spacing:1px;text-shadow:0 0 6px ${C.accent}66">⚔️ ARENA</button>
+        <div id="ba-tabs" style="display:flex;background:${C().bgCard};border-bottom:1px solid ${C().border};flex-shrink:0">
+            <button class="ba-tab active" data-tab="arena" style="flex:1;background:none;border:none;border-bottom:2px solid ${C().accent};padding:8px 0;cursor:pointer;color:${C().accent};font-family:'Press Start 2P',monospace;font-size:10px;letter-spacing:1px;text-shadow:0 0 6px ${C().accent}66">⚔️ ARENA</button>
             <button class="ba-tab" data-tab="records" style="flex:1;background:none;border:none;border-bottom:2px solid transparent;padding:8px 0;cursor:pointer;color:#442200;font-family:'Press Start 2P',monospace;font-size:10px;letter-spacing:1px">📜 RECORDS</button>
             <button class="ba-tab" data-tab="settings" style="flex:1;background:none;border:none;border-bottom:2px solid transparent;padding:8px 0;cursor:pointer;color:#442200;font-family:'Press Start 2P',monospace;font-size:10px;letter-spacing:1px">⚙️ CONFIG</button>
         </div>
@@ -820,33 +908,23 @@ function openPanel() {
                 b.style.textShadow='none';
             });
             btn.classList.add('active');
-            btn.style.color=C.accent;
-            btn.style.borderBottom=`2px solid ${C.accent}`;
-            btn.style.textShadow=`0 0 6px ${C.accent}66`;
+            btn.style.color=C().accent;
+            btn.style.borderBottom=`2px solid ${C().accent}`;
+            btn.style.textShadow=`0 0 6px ${C().accent}66`;
             switchTab(btn.dataset.tab);
         });
     });
 
     document.getElementById('ba-close')?.addEventListener('click', closePanel);
     document.getElementById('ba-theme-btn')?.addEventListener('click', () => {
-        const isDark = document.getElementById('ba-float').style.background.includes('060400') ||
-                       !document.getElementById('ba-float').dataset.theme || 
-                       document.getElementById('ba-float').dataset.theme === 'dark';
-        const panel  = document.getElementById('ba-float');
-        const btn    = document.getElementById('ba-theme-btn');
-        if (isDark) {
-            panel.dataset.theme = 'light';
-            panel.style.background = '#f5f0e8';
-            panel.style.borderColor = '#c8a878';
-            btn.textContent = '🔥';
-            document.getElementById('ba-content').style.background = '#f5f0e8';
-        } else {
-            panel.dataset.theme = 'dark';
-            panel.style.background = '#060400';
-            panel.style.borderColor = '#884400';
-            btn.textContent = '🌙';
-            document.getElementById('ba-content').style.background = '#060400';
-        }
+        saveTheme(_theme === 'dark' ? 'light' : 'dark');
+        closePanel(); openPanel();
+    });
+    document.getElementById('ba-theme-btn')?.addEventListener('click', () => {
+        saveTheme(_theme === 'dark' ? 'light' : 'dark');
+        // 패널 재빌드
+        closePanel();
+        openPanel();
     });
     state.isPanelOpen=true;
     renderArenaTab();
@@ -894,6 +972,7 @@ function injectCSS() {
 export async function onActivate() {
     console.log(`[${MODULE_NAME}] activate`);
     injectCSS();
+    _theme = getSettings().theme || 'dark';
 
     const ctx = SillyTavern.getContext();
     const profiles = ctx.extensionSettings?.['connectionManager']?.profiles || [];
