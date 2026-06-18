@@ -45,6 +45,22 @@ const THEMES = {
         resultBg: '#fbfffd', resultBorder: '#bfe8d8',
         tabInactive: '#a8d9c8',
     },
+    tiger: {
+        bg: '#fff7ec', bgCard: '#fffbf3', bgDeep: '#ffe8c8',
+        border: '#f0c090', borderBright: '#cc7722',
+        text: '#4a2800', textDim: '#b88550', textBright: '#2a1500',
+        accent: '#e8650a', gold: '#1f1f1f',
+        resultBg: '#fffcf6', resultBorder: '#f0c090',
+        tabInactive: '#e0b888',
+    },
+    retriever: {
+        bg: '#fffaf0', bgCard: '#fffdf8', bgDeep: '#fff0d8',
+        border: '#f0d8a0', borderBright: '#e0b050',
+        text: '#6a4a10', textDim: '#c0a060', textBright: '#4a3000',
+        accent: '#f0a830', gold: '#d4880a',
+        resultBg: '#fffdf8', resultBorder: '#f0d8a0',
+        tabInactive: '#e8cc90',
+    },
 };
 let _theme = 'dark';
 function C() { return THEMES[_theme] || THEMES.dark; }
@@ -60,8 +76,10 @@ const STAT_META = {
 
 // ─── 해금 마일스톤 ──────────────────────────
 const THEME_UNLOCKS = [
-    { id: 'platypus', threshold: 500,  label: '🦆 오리너구리', icon: '🦆' },
-    { id: 'deer',     threshold: 1000, label: '🦌 고라니',     icon: '🦌' },
+    { id: 'platypus',  threshold: 500,  label: '🦆 오리너구리', icon: '🦆' },
+    { id: 'deer',      threshold: 1000, label: '🦌 고라니',     icon: '🦌' },
+    { id: 'tiger',     threshold: 1500, label: '🐯 호랑이',     icon: '🐯' },
+    { id: 'retriever', threshold: 2000, label: '🐶 챱츄',       icon: '🐶' },
 ];
 
 // ─── 기본 설정 ─────────────────────────────
@@ -74,6 +92,7 @@ const defaultSettings = {
     lifetimePoints: 0,
     lastRefillAt: 0,
     unlockedThemes: ['dark', 'light'],
+    combatProfiles: {},   // { [charId]: { text, updatedAt } } — 전투 프로필 캐시
 };
 
 // ─── 상태 ──────────────────────────────────
@@ -107,7 +126,7 @@ function filterPhoneTrigger(t) {
 
 // ─── 포인트 / 해금 시스템 ───────────────────
 const REFILL_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const REFILL_AMOUNT = 50;
+const REFILL_AMOUNT = 10;
 
 function checkRefill() {
     const s = getSettings();
@@ -251,7 +270,13 @@ Analyze this character across EVERY dimension that could matter in ANY kind of c
 // combat 통합 판정 프롬프트 (1회) — 범용화
 // ═══════════════════════════════════════════
 const COMBAT_SYSTEM =
-`You are a serious, all-purpose confrontation analyst. You receive detailed profiles for each participant and a specific confrontation condition — which may be physical combat, verbal conflict, a wealth/status comparison, or a purely physical trait comparison. Write a rigorous analytical report in Korean, selecting only the profile fields relevant to the given condition. No roleplay, no game notation, no story prose — pure analysis.`;
+`You are a serious, all-purpose confrontation analyst. You receive detailed profiles for each participant and a specific confrontation condition — which may be physical combat, verbal conflict, a wealth/status comparison, a specific physical trait comparison (including precise/numeric measurements), or any other criterion the user specifies.
+
+CRITICAL RULE: You must judge the confrontation using EXACTLY the criterion stated in the condition. Do NOT substitute it with a different, more comfortable type of contest (e.g. do NOT turn a stated physical/numeric comparison into a verbal argument, debate, or "war of words" instead). If the condition names a specific metric, attribute, or measurement, your analysis and final verdict must be based on THAT metric.
+
+If the character profiles do not contain explicit data for the requested metric, invent a precise, plausible, internally-consistent fictional value or description for each character — consistent with their species/physique/background — and state it as a concrete fact for the purposes of this analysis. Do not hedge, do not say "정보가 없어 판단할 수 없다", do not deflect to a generic personality-based outcome. Commit fully to the requested comparison.
+
+Write a rigorous analytical report in Korean, selecting only the profile fields relevant to the given condition. No roleplay, no game notation, no story prose — pure analysis.`;
 
 function buildCombatPrompt(fighters, profiles, condition) {
     const fighterBlocks = fighters.map((f, i) => {
@@ -286,21 +311,23 @@ ${condition || '기본 대결. 특별한 제약 없음.'}
 [PARTICIPANTS — ${fighters.length} fighters]
 ${fighterBlocks}
 
-First, identify what TYPE of confrontation this condition describes (physical combat / verbal-social / material-wealth / physical-trait comparison / other), then select only the relevant profile fields above for your analysis.
+First, identify what TYPE of confrontation this condition describes (physical combat / verbal-social / material-wealth / physical-trait or numeric measurement comparison / other), then select only the relevant profile fields above for your analysis.
+
+IMPORTANT: The condition above specifies the EXACT criterion for this confrontation. You must judge fighters strictly on that criterion. Do not substitute it with a different, safer type of contest (for example, do not turn a stated physical/numeric comparison into a verbal argument or general personality contest). If the profiles lack a specific data point the condition asks about, invent a concrete, plausible, internally-consistent value for each fighter and treat it as established fact for this analysis — do not hedge or deflect.
 
 Write the analysis report in Korean in this exact order:
 
 ⚔️ 【전력 분석】
-For EACH fighter: analyze how their relevant traits (chosen based on the confrontation type) apply specifically to THIS condition. Draw explicit connections. (4-6 sentences per fighter)
+For EACH fighter: analyze how their relevant traits (chosen based on the confrontation type) apply specifically to THIS exact condition. Draw explicit connections. (4-6 sentences per fighter)
 
 🧮 【전황 시뮬레이션】
-Simulate how the confrontation actually unfolds from start to finish given the condition. Identify exact turning points and explain WHY they happen based on the fighters' specific traits — not generic outcomes. (8-12 sentences)
+Simulate how the confrontation actually unfolds from start to finish given the EXACT condition. Identify exact turning points and explain WHY they happen based on the fighters' specific traits — not generic outcomes. (8-12 sentences)
 
 ⚖️ 【변수 분석】
-Identify 3 specific wildcards that could realistically flip the outcome. Be specific to these characters and this condition type. (3-4 sentences)
+Identify 3 specific wildcards that could realistically flip the outcome. Be specific to these characters and this exact condition. (3-4 sentences)
 
 🏆 【최종 판정】
-State winner and clear reasoning. If multiple fighters, rank all.
+State winner and clear reasoning based strictly on the stated condition. If multiple fighters, rank all.
 Last line must be exactly:
 【최종 승자: [name] (승률 [XX]%)】`;
 }
@@ -538,15 +565,45 @@ function formatResult(record) {
 }
 
 // ═══════════════════════════════════════════
+// 테마 미리보기 (실제 적용 없이 색상 목업만 표시)
+// ═══════════════════════════════════════════
+function showThemePreview(themeId) {
+    document.getElementById('ba-theme-preview-panel')?.remove();
+    const pal = THEMES[themeId] || THEMES.dark;
+    const unlockMeta = THEME_UNLOCKS.find(u=>u.id===themeId);
+    const label = unlockMeta ? unlockMeta.label : (themeId==='dark' ? '🌙 다크' : '☀️ 라이트');
+
+    const panel = document.createElement('div');
+    panel.id = 'ba-theme-preview-panel';
+    const pw = Math.min(300, window.innerWidth * 0.85);
+    const pl = Math.max(10, (window.innerWidth - pw) / 2);
+    panel.style.cssText = `position:fixed;top:100px;left:${pl}px;width:${pw}px;background:${pal.bgCard};border:2px solid ${pal.borderBright};border-radius:4px;box-shadow:0 8px 30px rgba(0,0,0,0.4);z-index:10400;overflow:hidden;font-family:system-ui,sans-serif`;
+    panel.innerHTML = `
+        <div id="ba-tp-drag" style="background:${pal.bg};border-bottom:1px solid ${pal.border};padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:move;user-select:none">
+            <span style="font-size:11px;color:${pal.accent}">${label} 미리보기</span>
+            <button id="ba-tp-close" style="margin-left:auto;background:none;border:1px solid ${pal.border};border-radius:2px;color:${pal.textDim};cursor:pointer;font-size:10px;padding:2px 6px;font-family:monospace">✕</button>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
+            <div style="background:${pal.bgDeep};border:1px solid ${pal.border};border-radius:2px;padding:10px">
+                <div style="font-size:12px;color:${pal.textBright};margin-bottom:3px">캐릭터 이름</div>
+                <div style="font-size:11px;color:${pal.text}">카드 본문 텍스트 색상입니다</div>
+                <div style="font-size:10px;color:${pal.textDim};margin-top:4px">보조 텍스트 색상</div>
+            </div>
+            <button style="padding:9px;background:${pal.accent};border:none;border-radius:2px;color:#fff;font-size:11px;cursor:default">⚔️ FIGHT 버튼 색상</button>
+            <div style="font-size:12px;color:${pal.gold};text-align:center;padding:10px;border:2px solid ${pal.gold}55;border-radius:2px;background:${pal.bgCard}">🏆 WINNER 강조 색상</div>
+        </div>`;
+    document.body.appendChild(panel);
+    document.getElementById('ba-tp-close')?.addEventListener('click',()=>panel.remove());
+    makeDraggable(panel, document.getElementById('ba-tp-drag'));
+}
+
+// ═══════════════════════════════════════════
 // 전투 프로필 미리보기
 // ═══════════════════════════════════════════
-async function showCombatProfile(char) {
-    document.getElementById('ba-combat-profile-panel')?.remove();
-
+function buildCombatProfilePreviewPrompt(char) {
     const p   = char.parsed||{};
     const raw = p.raw||[p.appearance,p.personality,p.traits].filter(Boolean).join('\n');
-
-    const prompt = `Character: ${char.name} (${char.gender==='female'?'F':'M'}, ${p.age||'?'}, ${p.job||'?'})
+    return `Character: ${char.name} (${char.gender==='female'?'F':'M'}, ${p.age||'?'}, ${p.job||'?'})
 Stats: charm=${char.stats?.charm||50} presence=${char.stats?.presence||50} desire=${char.stats?.desire||50} wit=${char.stats?.wit||50} aura=${char.stats?.aura||50}
 Sheet summary: ${raw.slice(0,800)}
 
@@ -560,6 +617,42 @@ Extract a SHORT all-purpose confrontation profile (combat + social + material). 
 【심리】 combat/conflict psychology in 1 sentence
 【강점 한줄】 biggest advantage
 【약점 한줄】 biggest weakness`;
+}
+
+function renderCombatProfileBody(text) {
+    const lines = (text||'').split('\n').filter(l=>l.trim());
+    return lines.map(line=>{
+        const isHeader = line.startsWith('【');
+        return `<div style="margin-bottom:${isHeader?'2px':'10px'};${isHeader?`color:${C().accent};font-weight:700;font-size:11px;margin-top:10px`:`color:${C().text};font-size:13px;padding-left:8px`}">${esc(line)}</div>`;
+    }).join('');
+}
+
+async function runCombatProfileAnalysis(char) {
+    const body = document.getElementById('ba-cp-body');
+    if (body) {
+        body.innerHTML = `<div style="display:flex;gap:4px;align-items:center;color:${C().textDim};font-size:11px">
+            <span>분석 중</span><span class="ba-dot"></span><span class="ba-dot"></span><span class="ba-dot"></span>
+        </div>`;
+    }
+    try {
+        const result = await callAI(buildCombatProfilePreviewPrompt(char),
+            'You are an all-purpose confrontation analyst. Extract concise combat AND non-combat (social/material) information. Korean output only.');
+        const s = getSettings();
+        s.combatProfiles[char.id] = { text: result, updatedAt: Date.now() };
+        save();
+        const body2 = document.getElementById('ba-cp-body');
+        if (body2) body2.innerHTML = renderCombatProfileBody(result);
+    } catch(e) {
+        const body2 = document.getElementById('ba-cp-body');
+        if (body2) body2.innerHTML = `<div style="color:#ff4444;font-size:12px">분석 실패: ${esc(e.message)}</div>`;
+    }
+}
+
+async function showCombatProfile(char) {
+    document.getElementById('ba-combat-profile-panel')?.remove();
+
+    const s = getSettings();
+    const cached = s.combatProfiles[char.id];
 
     const panel = document.createElement('div');
     panel.id = 'ba-combat-profile-panel';
@@ -570,32 +663,19 @@ Extract a SHORT all-purpose confrontation profile (combat + social + material). 
         <div id="ba-cp-drag" style="background:${C().bg};border-bottom:1px solid ${C().border};padding:10px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;cursor:move;user-select:none">
             <span style="font-size:14px">⚔️</span>
             <div style="flex:1;font-family:'Press Start 2P',monospace;font-size:9px;color:${C().accent};letter-spacing:1px">${esc(char.name)} — 전투 프로필</div>
+            <button id="ba-cp-refresh" title="재분석" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:11px;padding:2px 6px;font-family:monospace">🔄</button>
             <button id="ba-cp-close" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:10px;padding:2px 6px;font-family:monospace">✕</button>
         </div>
         <div id="ba-cp-body" style="flex:1;overflow-y:auto;padding:14px 16px;font-family:system-ui,sans-serif;font-size:13px;color:${C().text};line-height:1.9">
-            <div style="display:flex;gap:4px;align-items:center;color:${C().textDim};font-size:11px">
-                <span>분석 중</span>
-                <span class="ba-dot"></span><span class="ba-dot"></span><span class="ba-dot"></span>
-            </div>
+            ${cached ? renderCombatProfileBody(cached.text) : `<div style="display:flex;gap:4px;align-items:center;color:${C().textDim};font-size:11px"><span>분석 중</span><span class="ba-dot"></span><span class="ba-dot"></span><span class="ba-dot"></span></div>`}
         </div>`;
     document.body.appendChild(panel);
     document.getElementById('ba-cp-close')?.addEventListener('click',()=>panel.remove());
+    document.getElementById('ba-cp-refresh')?.addEventListener('click',()=>runCombatProfileAnalysis(char));
     makeDraggable(panel, document.getElementById('ba-cp-drag'));
 
-    try {
-        const result = await callAI(prompt,
-            'You are an all-purpose confrontation analyst. Extract concise combat AND non-combat (social/material) information. Korean output only.');
-        const body = document.getElementById('ba-cp-body');
-        if (body) {
-            const lines = result.split('\n').filter(l=>l.trim());
-            body.innerHTML = lines.map(line=>{
-                const isHeader = line.startsWith('【');
-                return `<div style="margin-bottom:${isHeader?'2px':'10px'};${isHeader?`color:${C().accent};font-weight:700;font-size:11px;margin-top:10px`:`color:${C().text};font-size:13px;padding-left:8px`}">${esc(line)}</div>`;
-            }).join('');
-        }
-    } catch(e) {
-        const body = document.getElementById('ba-cp-body');
-        if (body) body.innerHTML = `<div style="color:#ff4444;font-size:12px">분석 실패: ${esc(e.message)}</div>`;
+    if (!cached) {
+        await runCombatProfileAnalysis(char);
     }
 }
 
@@ -907,12 +987,22 @@ function renderSettingsTab() {
     ];
 
     const themeButtonsHtml = themeButtons.map(t => {
+        const pal = THEMES[t.id] || THEMES.dark;
         const unlocked = t.always || s.unlockedThemes.includes(t.id);
         const active = _theme === t.id;
-        return `<button class="ba-theme-pick" data-theme="${t.id}" ${unlocked?'':'disabled'}
-            style="padding:8px 6px;background:${active?C().accent:C().bgCard};border:1px solid ${active?C().accent:C().border};border-radius:2px;color:${active?'#fff':unlocked?C().text:C().textDim};font-size:10px;font-family:system-ui;cursor:${unlocked?'pointer':'not-allowed'};opacity:${unlocked?1:0.5};position:relative">
-            ${t.label}${!unlocked?`<div style="font-size:8px;margin-top:2px">🔒 ${t.threshold}P</div>`:''}
-        </button>`;
+        const swatches = ['bg','accent','gold','border'].map(k=>
+            `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${pal[k]};border:1px solid rgba(0,0,0,0.2)"></span>`
+        ).join('');
+        return `<div class="ba-theme-card" style="background:${active?C().bgDeep:C().bgCard};border:1px solid ${active?C().accent:C().border};border-radius:2px;padding:8px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
+                <span style="font-size:10px;color:${unlocked?C().text:C().textDim};font-family:system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.label}</span>
+                <button class="ba-theme-preview-btn" data-theme="${t.id}" title="미리보기" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:10px;padding:1px 5px;line-height:1.5;flex-shrink:0">👁</button>
+            </div>
+            <div style="display:flex;gap:3px">${swatches}</div>
+            ${unlocked
+                ? `<button class="ba-theme-pick" data-theme="${t.id}" style="padding:5px;background:${active?C().accent:'none'};border:1px solid ${active?C().accent:C().border};border-radius:2px;color:${active?'#fff':C().text};font-size:9px;font-family:system-ui;cursor:pointer">${active?'사용 중':'적용'}</button>`
+                : `<div style="font-size:9px;color:${C().textDim};text-align:center;padding:3px 0">🔒 ${t.threshold}P</div>`}
+        </div>`;
     }).join('');
 
     content.innerHTML = `<div style="padding:16px;font-family:system-ui,sans-serif">
@@ -923,7 +1013,7 @@ function renderSettingsTab() {
         </div>
 
         <div style="font-size:9px;font-family:'Press Start 2P',monospace;color:${C().borderBright};letter-spacing:2px;border-bottom:1px solid ${C().border};padding-bottom:6px;margin-bottom:10px">🎨 THEMES</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
             ${themeButtonsHtml}
         </div>
 
@@ -951,12 +1041,17 @@ function renderSettingsTab() {
 
     document.querySelectorAll('.ba-theme-pick').forEach(btn=>{
         btn.addEventListener('click', ()=>{
-            if (btn.disabled) return;
             const wasTab = state.currentTab;
             saveTheme(btn.dataset.theme);
             closePanel();
             openPanel();
             if (wasTab !== 'arena') switchTab(wasTab);
+        });
+    });
+    document.querySelectorAll('.ba-theme-preview-btn').forEach(btn=>{
+        btn.addEventListener('click', e=>{
+            e.stopPropagation();
+            showThemePreview(btn.dataset.theme);
         });
     });
 
