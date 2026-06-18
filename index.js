@@ -7,6 +7,12 @@
  */
 
 import { event_types } from '../../../events.js';
+import {
+    COMBAT_PROFILE_SYSTEM, COMBAT_PROFILE_USER,
+    COMBAT_FINAL_SYSTEM, COMBAT_FINAL_USER,
+    COMBAT_PREVIEW_SYSTEM, COMBAT_PREVIEW_USER,
+    LOADING_STEPS, REPORT_SECTIONS,
+} from './prompts.js';
 
 const MODULE_NAME = 'chatl_royal';
 const SCOUTER_KEY = 'character_lab';
@@ -123,6 +129,9 @@ function avatarHue(n) { return [...n].reduce((a,c)=>a+c.charCodeAt(0),0)%360; }
 function filterPhoneTrigger(t) {
     return (t||'').replace(/<phone_trigger[^>]*>[\s\S]*?<\/phone_trigger>/gi,'').trim();
 }
+function fillTpl(tpl, vars) {
+    return tpl.replace(/\{\{(\w+)\}\}/g, (_,k) => vars[k] ?? '');
+}
 
 // ─── 포인트 / 해금 시스템 ───────────────────
 const REFILL_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -226,58 +235,25 @@ async function callAI(userPrompt, systemPrompt) {
 }
 
 // ═══════════════════════════════════════════
-// combatProfile 프롬프트 (파이터당 1회) — 범용화
+// combatProfile 프롬프트 (파이터당 1회) — prompts.js 템플릿 사용
 // ═══════════════════════════════════════════
-const COMBAT_PROFILE_SYSTEM =
-`You are an all-purpose confrontation analyst specializing in fictional character evaluation.
-Analyze the character's full potential across physical, social, and material dimensions — not just combat.
-Return ONLY valid JSON — no markdown, no code blocks, no extra text.`;
-
 function buildCombatProfilePrompt(char) {
     const p = char.parsed || {};
     const raw = p.raw || [p.appearance, p.personality, p.traits].filter(Boolean).join('\n');
-    return `Character name: ${char.name}
-Gender: ${char.gender === 'female' ? 'Female' : 'Male'}
-Age: ${p.age || 'Unknown'}
-Job/Role: ${p.job || 'Unknown'}
-Location/Background: ${p.location || 'Unknown'}
-Stats (each 0–100): charm=${char.stats?.charm||50} presence=${char.stats?.presence||50} desire=${char.stats?.desire||50} wit=${char.stats?.wit||50} aura=${char.stats?.aura||50}
-
-Full character sheet:
-${raw.slice(0, 1800)}
-
-Analyze this character across EVERY dimension that could matter in ANY kind of confrontation — physical combat, verbal/social conflict, material/wealth comparison, or purely physical trait comparison. Return ONLY this JSON:
-{
-  "species": "Species or entity type. If human: state human. If vampire/demi-human/spirit/god/AI/etc: fully analyze that species' inherent physical/supernatural traits, resistances, weaknesses, longevity-derived experience. Korean.",
-  "physique": "Precise physical specs — inferred height/weight/build from sheet, age-bracket physical peak, how build translates to combat. Korean.",
-  "physical_traits": "General physical/bodily characteristics relevant to non-combat physical comparisons (appearance, build, stamina, any specific traits mentioned in the sheet). If the sheet lacks specifics, reasonably infer from age/job/lifestyle and explicitly note it's an inference. Korean.",
-  "job_combat": "Rigorous combat interpretation of the job/role. DO NOT genericize. Korean.",
-  "experience": "Combat/conflict experience level in detail. Korean.",
-  "skills": "Specific skills — name martial arts styles, weapon types, magic schools, special powers, tactical skills. Korean.",
-  "worldsetting": "World/setting the character exists in — modern realistic / fantasy medieval / sci-fi / supernatural / mixed. Korean.",
-  "resources": "Wealth, assets, social status, family background, organizational backing, connections/network. If sheet lacks explicit info, infer reasonably from job/background and note it's an inference. Korean.",
-  "social_capital": "Charisma, rhetoric/debate skill, persuasiveness, social influence, reputation — relevant for verbal/social confrontations. Korean.",
-  "strengths": "3 specific scenarios/conditions where this character has a decisive advantage (any domain — physical, social, material). Korean.",
-  "weaknesses": "3 specific scenarios/conditions where this character is at a decisive disadvantage. Be honest. Korean.",
-  "psychology": "Combat/conflict psychology — pain threshold, fight-or-flight tendency, performance under stress, confidence under scrutiny. Korean.",
-  "background_factors": "Past traumas, special life experiences, grudges, survival history, near-death experiences, or formative wealth/status events that affect drive or ability in confrontation. Korean.",
-  "power_ceiling": "What is the absolute maximum this character could do at peak — in whatever domain applies? Korean.",
-  "anti_synergy": "What tactics, opponents, or conditions would specifically counter or neutralize this character's strengths? Korean."
-}`;
+    return fillTpl(COMBAT_PROFILE_USER, {
+        name: char.name,
+        gender: char.gender === 'female' ? 'Female' : 'Male',
+        age: p.age || 'Unknown',
+        job: p.job || 'Unknown',
+        location: p.location || 'Unknown',
+        stats: `charm=${char.stats?.charm||50} presence=${char.stats?.presence||50} desire=${char.stats?.desire||50} wit=${char.stats?.wit||50} aura=${char.stats?.aura||50}`,
+        sheet: raw.slice(0, 1800),
+    });
 }
 
 // ═══════════════════════════════════════════
-// combat 통합 판정 프롬프트 (1회) — 범용화
+// combat 통합 판정 프롬프트 (1회) — prompts.js 템플릿 사용
 // ═══════════════════════════════════════════
-const COMBAT_SYSTEM =
-`You are a serious, all-purpose confrontation analyst. You receive detailed profiles for each participant and a specific confrontation condition — which may be physical combat, verbal conflict, a wealth/status comparison, a specific physical trait comparison (including precise/numeric measurements), or any other criterion the user specifies.
-
-CRITICAL RULE: You must judge the confrontation using EXACTLY the criterion stated in the condition. Do NOT substitute it with a different, more comfortable type of contest (e.g. do NOT turn a stated physical/numeric comparison into a verbal argument, debate, or "war of words" instead). If the condition names a specific metric, attribute, or measurement, your analysis and final verdict must be based on THAT metric.
-
-If the character profiles do not contain explicit data for the requested metric, invent a precise, plausible, internally-consistent fictional value or description for each character — consistent with their species/physique/background — and state it as a concrete fact for the purposes of this analysis. Do not hedge, do not say "정보가 없어 판단할 수 없다", do not deflect to a generic personality-based outcome. Commit fully to the requested comparison.
-
-Write a rigorous analytical report in Korean, selecting only the profile fields relevant to the given condition. No roleplay, no game notation, no story prose — pure analysis.`;
-
 function buildCombatPrompt(fighters, profiles, condition) {
     const fighterBlocks = fighters.map((f, i) => {
         const pr = profiles[i];
@@ -305,44 +281,16 @@ ${stats}
 • Anti-Synergy: ${pr.anti_synergy||'—'}`;
     }).join('\n\n');
 
-    return `[CONFRONTATION CONDITION]
-${condition || '기본 대결. 특별한 제약 없음.'}
-
-[PARTICIPANTS — ${fighters.length} fighters]
-${fighterBlocks}
-
-First, identify what TYPE of confrontation this condition describes (physical combat / verbal-social / material-wealth / physical-trait or numeric measurement comparison / other), then select only the relevant profile fields above for your analysis.
-
-IMPORTANT: The condition above specifies the EXACT criterion for this confrontation. You must judge fighters strictly on that criterion. Do not substitute it with a different, safer type of contest (for example, do not turn a stated physical/numeric comparison into a verbal argument or general personality contest). If the profiles lack a specific data point the condition asks about, invent a concrete, plausible, internally-consistent value for each fighter and treat it as established fact for this analysis — do not hedge or deflect.
-
-Write the analysis report in Korean in this exact order:
-
-⚔️ 【전력 분석】
-For EACH fighter: analyze how their relevant traits (chosen based on the confrontation type) apply specifically to THIS exact condition. Draw explicit connections. (4-6 sentences per fighter)
-
-🧮 【전황 시뮬레이션】
-Simulate how the confrontation actually unfolds from start to finish given the EXACT condition. Identify exact turning points and explain WHY they happen based on the fighters' specific traits — not generic outcomes. (8-12 sentences)
-
-⚖️ 【변수 분석】
-Identify 3 specific wildcards that could realistically flip the outcome. Be specific to these characters and this exact condition. (3-4 sentences)
-
-🏆 【최종 판정】
-State winner and clear reasoning based strictly on the stated condition. If multiple fighters, rank all.
-Last line must be exactly:
-【최종 승자: [name] (승률 [XX]%)】`;
+    return fillTpl(COMBAT_FINAL_USER, {
+        condition: condition || '기본 대결. 특별한 제약 없음.',
+        fighterCount: fighters.length,
+        fighters: fighterBlocks,
+    });
 }
 
 // ═══════════════════════════════════════════
 // 로딩 UI
 // ═══════════════════════════════════════════
-const LOADING_STEPS = [
-    'SCANNING FIGHTERS...',
-    'ANALYZING COMBAT PROFILE...',
-    'CALCULATING POWER LEVELS...',
-    'RUNNING SIMULATION...',
-    'DETERMINING OUTCOME...',
-];
-
 function showLoading(stepMsg) {
     let el = document.getElementById('ba-loading');
     if (!el) {
@@ -425,7 +373,7 @@ async function runBattle(condition, bet) {
 
         updateLoadingMsg('RUNNING SIMULATION...');
         const combatPrompt = buildCombatPrompt(fighters, profiles, condition);
-        const resultText   = await callAI(combatPrompt, COMBAT_SYSTEM);
+        const resultText   = await callAI(combatPrompt, COMBAT_FINAL_SYSTEM);
 
         hideLoading();
 
@@ -534,14 +482,8 @@ function formatResult(record) {
     }
 
     const text = record.resultText || '';
-    const secs = [
-        { icon:'⚔️', key:'전력 분석' },
-        { icon:'🧮', key:'전황 시뮬레이션' },
-        { icon:'⚖️', key:'변수 분석' },
-        { icon:'🏆', key:'최종 판정' },
-    ];
     let body = '';
-    for (const sec of secs) {
+    for (const sec of REPORT_SECTIONS) {
         const rx = new RegExp(`${sec.icon}[^\\n]*【${sec.key}】([\\s\\S]*?)(?=⚔️|🧮|⚖️|🏆|$)`,'u');
         const m  = text.match(rx);
         const content = m ? m[1].trim() : '';
@@ -603,20 +545,14 @@ function showThemePreview(themeId) {
 function buildCombatProfilePreviewPrompt(char) {
     const p   = char.parsed||{};
     const raw = p.raw||[p.appearance,p.personality,p.traits].filter(Boolean).join('\n');
-    return `Character: ${char.name} (${char.gender==='female'?'F':'M'}, ${p.age||'?'}, ${p.job||'?'})
-Stats: charm=${char.stats?.charm||50} presence=${char.stats?.presence||50} desire=${char.stats?.desire||50} wit=${char.stats?.wit||50} aura=${char.stats?.aura||50}
-Sheet summary: ${raw.slice(0,800)}
-
-Extract a SHORT all-purpose confrontation profile (combat + social + material). Return in Korean, plain text, no JSON:
-【종족/신체】 species/build/age-peak in 1 sentence
-【직업 전투해석】 how their job translates to combat ability in 1 sentence
-【전투 경험】 estimated real combat experience in 1 sentence
-【주요 기술】 specific combat skills, weapons, powers in 1 sentence
-【재산/지위】 wealth, status, connections — infer if not explicit, note it's inferred
-【화술/매력】 rhetoric, charisma, social influence in 1 sentence
-【심리】 combat/conflict psychology in 1 sentence
-【강점 한줄】 biggest advantage
-【약점 한줄】 biggest weakness`;
+    return fillTpl(COMBAT_PREVIEW_USER, {
+        name: char.name,
+        gender: char.gender==='female'?'F':'M',
+        age: p.age||'?',
+        job: p.job||'?',
+        stats: `charm=${char.stats?.charm||50} presence=${char.stats?.presence||50} desire=${char.stats?.desire||50} wit=${char.stats?.wit||50} aura=${char.stats?.aura||50}`,
+        sheet: raw.slice(0,800),
+    });
 }
 
 function renderCombatProfileBody(text) {
@@ -635,8 +571,7 @@ async function runCombatProfileAnalysis(char) {
         </div>`;
     }
     try {
-        const result = await callAI(buildCombatProfilePreviewPrompt(char),
-            'You are an all-purpose confrontation analyst. Extract concise combat AND non-combat (social/material) information. Korean output only.');
+        const result = await callAI(buildCombatProfilePreviewPrompt(char), COMBAT_PREVIEW_SYSTEM);
         const s = getSettings();
         s.combatProfiles[char.id] = { text: result, updatedAt: Date.now() };
         save();
@@ -1189,39 +1124,10 @@ function togglePanel() {
 }
 
 // ═══════════════════════════════════════════
-// CSS 인젝션
-// ═══════════════════════════════════════════
-function injectCSS() {
-    if (document.getElementById('ba-style')) return;
-    const s = document.createElement('style');
-    s.id = 'ba-style';
-    s.textContent = `
-        @keyframes ba-shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
-        @keyframes ba-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        @keyframes ba-winner-glow { 0%,100%{box-shadow:0 0 10px #ffaa0044} 50%{box-shadow:0 0 25px #ffaa00aa,0 0 50px #ff660044} }
-        @keyframes ba-pulse-ring { 0%,100%{opacity:0.3} 50%{opacity:0.8} }
-        @keyframes ba-flicker { 0%,95%,100%{opacity:1} 96%,99%{opacity:0.4} }
-        @keyframes ba-dot { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1.1);opacity:1} }
-        .ba-pulse-ring { animation: ba-pulse-ring 2s ease-in-out infinite; }
-        .ba-flicker { animation: ba-flicker 4s ease-in-out infinite; }
-        .ba-dot { width:5px;height:5px;border-radius:50%;background:#ff8800;display:inline-block;animation:ba-dot 1.2s ease-in-out infinite; }
-        .ba-dot:nth-child(2){animation-delay:0.2s} .ba-dot:nth-child(3){animation-delay:0.4s}
-        #ba-result-body::-webkit-scrollbar{width:4px}
-        #ba-result-body::-webkit-scrollbar-track{background:#050300}
-        #ba-result-body::-webkit-scrollbar-thumb{background:#664400;border-radius:2px}
-        #ba-content::-webkit-scrollbar{width:4px}
-        #ba-content::-webkit-scrollbar-track{background:#060400}
-        #ba-content::-webkit-scrollbar-thumb{background:#884400;border-radius:2px}
-    `;
-    document.head.appendChild(s);
-}
-
-// ═══════════════════════════════════════════
 // 초기화
 // ═══════════════════════════════════════════
 export async function onActivate() {
     console.log(`[${MODULE_NAME}] activate`);
-    injectCSS();
     _theme = getSettings().theme || 'dark';
     checkRefill();
 
