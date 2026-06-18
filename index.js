@@ -384,7 +384,13 @@ async function runBattle(condition, bet) {
         // 베팅 정산
         let betResult = null;
         if (bet && bet.amount > 0) {
-            const won = bet.fighterName === winner;
+            // 이름 매칭 — AI가 이름을 약간 다르게 쓸 수 있어서 포함 여부로 판정
+            const normalize = s => (s||'').trim().toLowerCase().replace(/\s+/g,' ');
+            const winnerNorm = normalize(winner);
+            const betNorm    = normalize(bet.fighterName);
+            const won = winnerNorm === betNorm
+                || winnerNorm.includes(betNorm)
+                || betNorm.includes(winnerNorm);
             if (won) {
                 addPoints(bet.amount);
                 betResult = { won: true, amount: bet.amount, fighterName: bet.fighterName };
@@ -1194,6 +1200,22 @@ export async function onActivate() {
     }
 
     document.addEventListener('keydown', e=>{ if(e.key==='Escape'&&state.isPanelOpen) closePanel(); });
+
+    // 🎮 제작자 치트키 — Ctrl+Shift+B
+    // 포인트 9999, 모든 테마 해금
+    document.addEventListener('keydown', e=>{
+        if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+            const s = getSettings();
+            s.points = 9999;
+            s.lifetimePoints = 9999;
+            s.unlockedThemes = ['dark', 'light', 'snow', 'deer', 'tiger', 'ghost'];
+            save();
+            toastr.success('🎮 개발자 모드 — 포인트 9999, 전 테마 해금', '봉봉 치트키');
+            if (state.currentTab === 'settings') renderSettingsTab();
+            if (state.currentTab === 'arena') renderArenaTab();
+        }
+    });
+
     console.log(`[${MODULE_NAME}] ready`);
 }
 
