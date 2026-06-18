@@ -20,9 +20,9 @@
 #ba-content::-webkit-scrollbar-track { background:#060400 }
 #ba-content::-webkit-scrollbar-thumb { background:#884400;border-radius:2px }
 
-#ba-result-panel > div:nth-child(2)::-webkit-scrollbar       { width:4px }
-#ba-result-panel > div:nth-child(2)::-webkit-scrollbar-track { background:#050300 }
-#ba-result-panel > div:nth-child(2)::-webkit-scrollbar-thumb { background:#664400;border-radius:2px }
+#ba-result-body::-webkit-scrollbar       { width:4px }
+#ba-result-body::-webkit-scrollbar-track { background:#050300 }
+#ba-result-body::-webkit-scrollbar-thumb { background:#664400;border-radius:2px }
 
 /* 탭 */
 .ba-tab { transition: color 0.15s, border-bottom-color 0.15s; }
