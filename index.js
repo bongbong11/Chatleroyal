@@ -1,8 +1,9 @@
 /**
- * ⚔️ 챗틀로얄 v1.0
+ * ⚔️ 챗틀로얄 v2.0
  * SillyTavern Extension
  * Scouter (character_lab) roster 읽기 전용
  * combatProfile(파이터당) → combat(통합판정) 2단계 호출
+ * + 베팅/포인트 시스템 + 테마 해금
  */
 
 import { event_types } from '../../../events.js';
@@ -28,9 +29,25 @@ const THEMES = {
         resultBg: '#fdfcff', resultBorder: '#c8b8ee',
         tabInactive: '#aa99cc',
     },
+    platypus: {
+        bg: '#fff8f0', bgCard: '#fffaf5', bgDeep: '#fcefe0',
+        border: '#e8c8a0', borderBright: '#cc9955',
+        text: '#7a5530', textDim: '#bb9970', textBright: '#5a3a10',
+        accent: '#dd8833', gold: '#bb6622',
+        resultBg: '#fffbf6', resultBorder: '#e8c8a0',
+        tabInactive: '#ddbb88',
+    },
+    deer: {
+        bg: '#f3fbf8', bgCard: '#fbfffd', bgDeep: '#e6f7ef',
+        border: '#bfe8d8', borderBright: '#7fcdb0',
+        text: '#3a6e5e', textDim: '#9bc9b8', textBright: '#1f4a3c',
+        accent: '#5fb89a', gold: '#9b8fd9',
+        resultBg: '#fbfffd', resultBorder: '#bfe8d8',
+        tabInactive: '#a8d9c8',
+    },
 };
 let _theme = 'dark';
-function C() { return THEMES[_theme]; }
+function C() { return THEMES[_theme] || THEMES.dark; }
 function saveTheme(t) { _theme = t; const s=getSettings(); s.theme=t; save(); }
 
 const STAT_META = {
@@ -41,12 +58,22 @@ const STAT_META = {
     aura:     { label: '⚡', color: '#4488ff' },
 };
 
+// ─── 해금 마일스톤 ──────────────────────────
+const THEME_UNLOCKS = [
+    { id: 'platypus', threshold: 500,  label: '🦆 오리너구리', icon: '🦆' },
+    { id: 'deer',     threshold: 1000, label: '🦌 고라니',     icon: '🦌' },
+];
+
 // ─── 기본 설정 ─────────────────────────────
 const defaultSettings = {
     records: [],
     selectedProfileName: null,
     maxTokens: 4000,
     theme: 'dark',
+    points: 100,
+    lifetimePoints: 0,
+    lastRefillAt: 0,
+    unlockedThemes: ['dark', 'light'],
 };
 
 // ─── 상태 ──────────────────────────────────
@@ -78,6 +105,57 @@ function filterPhoneTrigger(t) {
     return (t||'').replace(/<phone_trigger[^>]*>[\s\S]*?<\/phone_trigger>/gi,'').trim();
 }
 
+// ─── 포인트 / 해금 시스템 ───────────────────
+const REFILL_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const REFILL_AMOUNT = 50;
+
+function checkRefill() {
+    const s = getSettings();
+    const now = Date.now();
+    if (!s.lastRefillAt) { s.lastRefillAt = now; save(); return; }
+    const elapsed = now - s.lastRefillAt;
+    if (elapsed >= REFILL_INTERVAL_MS) {
+        const cycles = Math.floor(elapsed / REFILL_INTERVAL_MS);
+        s.points += REFILL_AMOUNT * cycles;
+        s.lastRefillAt += REFILL_INTERVAL_MS * cycles;
+        save();
+        toastr.success(`⏰ 일일 포인트 +${REFILL_AMOUNT*cycles}P 충전!`);
+    }
+}
+
+function getRefillCountdown() {
+    const s = getSettings();
+    const next = (s.lastRefillAt || Date.now()) + REFILL_INTERVAL_MS;
+    const remain = Math.max(0, next - Date.now());
+    const h = Math.floor(remain / 3600000);
+    const m = Math.floor((remain % 3600000) / 60000);
+    return `${h}h ${m}m`;
+}
+
+function checkThemeUnlocks() {
+    const s = getSettings();
+    let newlyUnlocked = [];
+    for (const u of THEME_UNLOCKS) {
+        if (s.lifetimePoints >= u.threshold && !s.unlockedThemes.includes(u.id)) {
+            s.unlockedThemes.push(u.id);
+            newlyUnlocked.push(u);
+        }
+    }
+    if (newlyUnlocked.length) {
+        save();
+        newlyUnlocked.forEach(u => toastr.success(`🎉 새 테마 해금! ${u.label}`));
+    }
+    return newlyUnlocked;
+}
+
+function addPoints(amount) {
+    const s = getSettings();
+    s.points = Math.max(0, s.points + amount);
+    if (amount > 0) s.lifetimePoints += amount;
+    save();
+    checkThemeUnlocks();
+}
+
 // ─── Scouter roster 읽기 ───────────────────
 function getRoster() {
     const ctx = SillyTavern.getContext();
@@ -95,19 +173,6 @@ function resolveAvatarUrl(charName) {
     if (pe)
         return `/thumbnail?type=persona&file=${encodeURIComponent(pe[0])}`;
     return null;
-}
-
-// ─── 아바타 HTML ────────────────────────────
-function avatarHTML(name, gender, size=54, extraStyle='') {
-    const url = resolveAvatarUrl(name);
-    const hue = avatarHue(name);
-    const gc  = gender==='female'?'#ff44aa':'#4488ff';
-    const ini = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-    const fallback = `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:${Math.round(size*.33)}px;font-weight:900;color:hsl(${hue},50%,70%);font-family:monospace">${ini}</div>`;
-    const base = `width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;border:2px solid ${gc};flex-shrink:0;background:${C().bgCard};${extraStyle}`;
-    if (url)
-        return `<div style="${base}"><img src="${url}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='${fallback.replace(/'/g,"\\'")}'"></div>`;
-    return `<div style="${base};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*.33)}px;font-weight:900;color:hsl(${hue},50%,70%);font-family:monospace">${ini}</div>`;
 }
 
 // ═══════════════════════════════════════════
@@ -142,11 +207,11 @@ async function callAI(userPrompt, systemPrompt) {
 }
 
 // ═══════════════════════════════════════════
-// combatProfile 프롬프트 (파이터당 1회)
+// combatProfile 프롬프트 (파이터당 1회) — 범용화
 // ═══════════════════════════════════════════
 const COMBAT_PROFILE_SYSTEM =
-`You are a combat analyst specializing in fictional character evaluation.
-Analyze the character's full combat/conflict potential from every possible angle.
+`You are an all-purpose confrontation analyst specializing in fictional character evaluation.
+Analyze the character's full potential across physical, social, and material dimensions — not just combat.
 Return ONLY valid JSON — no markdown, no code blocks, no extra text.`;
 
 function buildCombatProfilePrompt(char) {
@@ -162,28 +227,31 @@ Stats (each 0–100): charm=${char.stats?.charm||50} presence=${char.stats?.pres
 Full character sheet:
 ${raw.slice(0, 1800)}
 
-Analyze this character's full combat/conflict potential and return ONLY this JSON:
+Analyze this character across EVERY dimension that could matter in ANY kind of confrontation — physical combat, verbal/social conflict, material/wealth comparison, or purely physical trait comparison. Return ONLY this JSON:
 {
   "species": "Species or entity type. If human: state human. If vampire/demi-human/spirit/god/AI/etc: fully analyze that species' inherent physical/supernatural traits, resistances, weaknesses, longevity-derived experience. Korean.",
-  "physique": "Precise physical specs — inferred height/weight/build from sheet, age-bracket physical peak (20s explosive/30s prime/40s veteran/50s+ experience-over-power), how build translates to combat (linebacker=short burst explosive power + high pain tolerance, swimmer=endurance + reach, wizard=physical frailty + possibly sedentary). Korean.",
-  "job_combat": "Rigorous combat interpretation of the job/role. DO NOT genericize. Examples: wide receiver→explosive 40-yard burst, jump ball, but zero combat training; SAS operator→CQC muscle memory, real kill experience, cold-blood; mafia boss→tactical command, intimidation, low direct combat but resources; court magician→magic power but physically weak; detective→pattern recognition + firearms but no hand-to-hand. Korean.",
-  "experience": "Combat/conflict experience level in detail — total civilian / street brawls / trained military / real warzone / assassin-grade / superhuman veteran. Include estimated number of real fights if inferrable. Korean.",
-  "skills": "Specific skills and disciplines — name martial arts styles, weapon types, magic schools, special powers, tactical skills. Be precise (e.g. 'Muay Thai + wrestling clinch' not just 'fighting'). Korean.",
-  "worldsetting": "World/setting the character exists in — modern realistic / fantasy medieval / sci-fi / supernatural / mixed. This defines what rules apply: firearms exist? magic? superhuman healing? tech augmentation? Korean.",
-  "strengths": "3 specific scenarios/conditions where this character has a decisive advantage. Tie to actual traits. Korean.",
+  "physique": "Precise physical specs — inferred height/weight/build from sheet, age-bracket physical peak, how build translates to combat. Korean.",
+  "physical_traits": "General physical/bodily characteristics relevant to non-combat physical comparisons (appearance, build, stamina, any specific traits mentioned in the sheet). If the sheet lacks specifics, reasonably infer from age/job/lifestyle and explicitly note it's an inference. Korean.",
+  "job_combat": "Rigorous combat interpretation of the job/role. DO NOT genericize. Korean.",
+  "experience": "Combat/conflict experience level in detail. Korean.",
+  "skills": "Specific skills — name martial arts styles, weapon types, magic schools, special powers, tactical skills. Korean.",
+  "worldsetting": "World/setting the character exists in — modern realistic / fantasy medieval / sci-fi / supernatural / mixed. Korean.",
+  "resources": "Wealth, assets, social status, family background, organizational backing, connections/network. If sheet lacks explicit info, infer reasonably from job/background and note it's an inference. Korean.",
+  "social_capital": "Charisma, rhetoric/debate skill, persuasiveness, social influence, reputation — relevant for verbal/social confrontations. Korean.",
+  "strengths": "3 specific scenarios/conditions where this character has a decisive advantage (any domain — physical, social, material). Korean.",
   "weaknesses": "3 specific scenarios/conditions where this character is at a decisive disadvantage. Be honest. Korean.",
-  "psychology": "Combat psychology — pain threshold, fight-or-flight tendency, performance under mortal stress, history of breaking or holding under pressure, berserker tendency or cold calculation. Korean.",
-  "background_factors": "Past traumas, special life experiences, grudges, survival history, near-death experiences that affect combat ability or fighting drive. Korean.",
-  "power_ceiling": "What is the absolute maximum this character could do at peak — what would their strongest moment look like? Korean.",
-  "anti_synergy": "What tactics or opponents would specifically counter or neutralize this character's strengths? Korean."
+  "psychology": "Combat/conflict psychology — pain threshold, fight-or-flight tendency, performance under stress, confidence under scrutiny. Korean.",
+  "background_factors": "Past traumas, special life experiences, grudges, survival history, near-death experiences, or formative wealth/status events that affect drive or ability in confrontation. Korean.",
+  "power_ceiling": "What is the absolute maximum this character could do at peak — in whatever domain applies? Korean.",
+  "anti_synergy": "What tactics, opponents, or conditions would specifically counter or neutralize this character's strengths? Korean."
 }`;
 }
 
 // ═══════════════════════════════════════════
-// combat 통합 판정 프롬프트 (1회)
+// combat 통합 판정 프롬프트 (1회) — 범용화
 // ═══════════════════════════════════════════
 const COMBAT_SYSTEM =
-`You are a serious combat and conflict analyst. You receive detailed combat profiles for each participant and a specific conflict condition. Write a rigorous analytical report in Korean. No roleplay, no game notation, no story prose — pure analysis.`;
+`You are a serious, all-purpose confrontation analyst. You receive detailed profiles for each participant and a specific confrontation condition — which may be physical combat, verbal conflict, a wealth/status comparison, or a purely physical trait comparison. Write a rigorous analytical report in Korean, selecting only the profile fields relevant to the given condition. No roleplay, no game notation, no story prose — pure analysis.`;
 
 function buildCombatPrompt(fighters, profiles, condition) {
     const fighterBlocks = fighters.map((f, i) => {
@@ -194,13 +262,16 @@ function buildCombatPrompt(fighters, profiles, condition) {
 ${stats}
   TOTAL: ${getTotal(f)}
 
-[Combat Profile]
+[Profile]
 • Species/Entity: ${pr.species||'—'}
 • Physique: ${pr.physique||'—'}
+• Physical Traits: ${pr.physical_traits||'—'}
 • Job (Combat Interpretation): ${pr.job_combat||'—'}
 • Experience: ${pr.experience||'—'}
 • Skills: ${pr.skills||'—'}
 • World Setting: ${pr.worldsetting||'—'}
+• Resources/Status: ${pr.resources||'—'}
+• Social Capital: ${pr.social_capital||'—'}
 • Strengths: ${pr.strengths||'—'}
 • Weaknesses: ${pr.weaknesses||'—'}
 • Psychology: ${pr.psychology||'—'}
@@ -209,22 +280,24 @@ ${stats}
 • Anti-Synergy: ${pr.anti_synergy||'—'}`;
     }).join('\n\n');
 
-    return `[CONFLICT CONDITION]
+    return `[CONFRONTATION CONDITION]
 ${condition || '기본 대결. 특별한 제약 없음.'}
 
 [PARTICIPANTS — ${fighters.length} fighters]
 ${fighterBlocks}
 
+First, identify what TYPE of confrontation this condition describes (physical combat / verbal-social / material-wealth / physical-trait comparison / other), then select only the relevant profile fields above for your analysis.
+
 Write the analysis report in Korean in this exact order:
 
 ⚔️ 【전력 분석】
-For EACH fighter: analyze how their species, physique, job, skills, and psychology apply specifically to THIS condition. Draw explicit connections between their traits and the condition's demands. (4-6 sentences per fighter)
+For EACH fighter: analyze how their relevant traits (chosen based on the confrontation type) apply specifically to THIS condition. Draw explicit connections. (4-6 sentences per fighter)
 
 🧮 【전황 시뮬레이션】
 Simulate how the confrontation actually unfolds from start to finish given the condition. Identify exact turning points and explain WHY they happen based on the fighters' specific traits — not generic outcomes. (8-12 sentences)
 
 ⚖️ 【변수 분석】
-Identify 3 specific wildcards that could realistically flip the outcome — psychology breaks, terrain factors, species-specific vulnerabilities, emotional triggers from background. Be specific to these characters. (3-4 sentences)
+Identify 3 specific wildcards that could realistically flip the outcome. Be specific to these characters and this condition type. (3-4 sentences)
 
 🏆 【최종 판정】
 State winner and clear reasoning. If multiple fighters, rank all.
@@ -288,14 +361,13 @@ function updateLoadingMsg(msg) {
 }
 
 // ═══════════════════════════════════════════
-// 배틀 실행
+// 배틀 실행 (+ 베팅 정산)
 // ═══════════════════════════════════════════
-async function runBattle(condition) {
+async function runBattle(condition, bet) {
     const fighters = [...state.selectedFighters];
     showLoading('SCANNING FIGHTERS...');
 
     try {
-        // 1단계: 파이터당 combatProfile
         const profiles = [];
         for (let i = 0; i < fighters.length; i++) {
             const f = fighters[i];
@@ -305,14 +377,16 @@ async function runBattle(condition) {
                 const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
                 profiles.push(parsed);
             } catch {
-                // 파싱 실패 시 최소 폴백
                 profiles.push({
                     species: f.parsed?.traits || '인간',
                     physique: f.parsed?.appearance || '—',
+                    physical_traits: f.parsed?.appearance || '—',
                     job_combat: f.parsed?.job || '—',
                     experience: '불명',
                     skills: f.parsed?.traits || '—',
                     worldsetting: '현대 현실',
+                    resources: '정보 없음 (추론 불가)',
+                    social_capital: '—',
                     strengths: '—', weaknesses: '—',
                     psychology: f.parsed?.personality || '—',
                     background_factors: '—',
@@ -322,19 +396,29 @@ async function runBattle(condition) {
             }
         }
 
-        // 2단계: 통합 판정
         updateLoadingMsg('RUNNING SIMULATION...');
         const combatPrompt = buildCombatPrompt(fighters, profiles, condition);
         const resultText   = await callAI(combatPrompt, COMBAT_SYSTEM);
 
         hideLoading();
 
-        // 승자 파싱
         const wm = resultText.match(/【최종 승자:\s*(.+?)\s*\(승률\s*(\d+)%\)】/);
         const winner  = wm ? wm[1].trim() : '???';
         const winRate = wm ? parseInt(wm[2]) : null;
 
-        // 기록 저장
+        // 베팅 정산
+        let betResult = null;
+        if (bet && bet.amount > 0) {
+            const won = bet.fighterName === winner;
+            if (won) {
+                addPoints(bet.amount);
+                betResult = { won: true, amount: bet.amount, fighterName: bet.fighterName };
+            } else {
+                addPoints(-bet.amount);
+                betResult = { won: false, amount: bet.amount, fighterName: bet.fighterName };
+            }
+        }
+
         const record = {
             id: `battle_${Date.now()}_${Math.random().toString(36).slice(2)}`,
             fighters: fighters.map(f => ({
@@ -343,6 +427,7 @@ async function runBattle(condition) {
             profiles,
             condition: condition || '기본 대결',
             winner, winRate, resultText,
+            bet: betResult,
             createdAt: new Date().toLocaleDateString('ko').slice(2).replace(/\. /g, '.'),
         };
         const s = getSettings();
@@ -353,7 +438,6 @@ async function runBattle(condition) {
         openResultPanel(record);
         renderArenaTab();
 
-        // 승자 하이라이트
         setTimeout(() => {
             document.querySelectorAll('.ba-fighter-slot').forEach(slot => {
                 const idx = parseInt(slot.dataset.idx);
@@ -382,9 +466,6 @@ function openResultPanel(record) {
 
     const panel = document.createElement('div');
     panel.id    = 'ba-result-panel';
-
-    const fighterNames = record.fighters.map(f=>f.name).join(' VS ');
-    const wm = winnerMatch(record.resultText);
 
     panel.innerHTML = `
         <div id="ba-result-drag" style="background:${C().bg};border-bottom:2px solid ${C().border};padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:move;flex-shrink:0;user-select:none">
@@ -416,7 +497,15 @@ function formatResult(record) {
     const winner  = wm ? wm[1].trim() : record.winner || '???';
     const winRate = wm ? wm[2] : record.winRate || '??';
 
-    // 섹션 파싱
+    let betBanner = '';
+    if (record.bet) {
+        const b = record.bet;
+        betBanner = `<div style="font-family:'Press Start 2P',monospace;font-size:11px;text-align:center;padding:10px;border:2px solid ${b.won?C().gold:'#cc3333'}55;border-radius:2px;background:${C().bgCard};letter-spacing:1px;margin-bottom:14px;color:${b.won?C().gold:'#ff5555'}">
+            ${b.won ? `🎉 베팅 성공! +${b.amount}P` : `💸 베팅 실패... -${b.amount}P`}
+            <div style="font-size:9px;margin-top:4px;color:${C().textDim}">${esc(b.fighterName)}에게 ${b.amount}P 베팅</div>
+        </div>`;
+    }
+
     const text = record.resultText || '';
     const secs = [
         { icon:'⚔️', key:'전력 분석' },
@@ -440,6 +529,7 @@ function formatResult(record) {
     return `
         <div style="${resultBodyStyle}">
             <div style="font-family:'Press Start 2P',monospace;font-size:10px;color:${C().textDim};margin-bottom:14px;letter-spacing:1px;line-height:2.5">${esc(fighterNames)}<br>${esc(record.condition.slice(0,60))}</div>
+            ${betBanner}
             <div style="font-family:'Press Start 2P',monospace;font-size:13px;color:${C().gold};text-align:center;padding:14px;border:2px solid ${C().gold}55;border-radius:2px;background:${C().bgCard};letter-spacing:2px;text-shadow:0 0 12px ${C().gold}88;margin-bottom:20px;animation:ba-winner-glow 2s ease-in-out infinite">
                 🏆 WINNER: ${esc(winner)} (${winRate}%)
             </div>
@@ -447,28 +537,27 @@ function formatResult(record) {
         </div>`;
 }
 
-
 // ═══════════════════════════════════════════
 // 전투 프로필 미리보기
 // ═══════════════════════════════════════════
 async function showCombatProfile(char) {
-    // 기존 창 닫기
     document.getElementById('ba-combat-profile-panel')?.remove();
 
     const p   = char.parsed||{};
     const raw = p.raw||[p.appearance,p.personality,p.traits].filter(Boolean).join('\n');
 
-    // 간단 버전 프롬프트 (전투 특성만, 짧게)
     const prompt = `Character: ${char.name} (${char.gender==='female'?'F':'M'}, ${p.age||'?'}, ${p.job||'?'})
 Stats: charm=${char.stats?.charm||50} presence=${char.stats?.presence||50} desire=${char.stats?.desire||50} wit=${char.stats?.wit||50} aura=${char.stats?.aura||50}
 Sheet summary: ${raw.slice(0,800)}
 
-Extract ONLY combat-relevant facts. Return in Korean, plain text, no JSON:
+Extract a SHORT all-purpose confrontation profile (combat + social + material). Return in Korean, plain text, no JSON:
 【종족/신체】 species/build/age-peak in 1 sentence
 【직업 전투해석】 how their job translates to combat ability in 1 sentence
 【전투 경험】 estimated real combat experience in 1 sentence
 【주요 기술】 specific combat skills, weapons, powers in 1 sentence
-【심리】 combat psychology in 1 sentence
+【재산/지위】 wealth, status, connections — infer if not explicit, note it's inferred
+【화술/매력】 rhetoric, charisma, social influence in 1 sentence
+【심리】 combat/conflict psychology in 1 sentence
 【강점 한줄】 biggest advantage
 【약점 한줄】 biggest weakness`;
 
@@ -495,10 +584,9 @@ Extract ONLY combat-relevant facts. Return in Korean, plain text, no JSON:
 
     try {
         const result = await callAI(prompt,
-            'You are a combat analyst. Extract only combat-relevant information, concisely. Korean output only.');
+            'You are an all-purpose confrontation analyst. Extract concise combat AND non-combat (social/material) information. Korean output only.');
         const body = document.getElementById('ba-cp-body');
         if (body) {
-            // 섹션별 포맷
             const lines = result.split('\n').filter(l=>l.trim());
             body.innerHTML = lines.map(line=>{
                 const isHeader = line.startsWith('【');
@@ -512,26 +600,24 @@ Extract ONLY combat-relevant facts. Return in Korean, plain text, no JSON:
 }
 
 // ═══════════════════════════════════════════
-// 상황 입력 모달
+// 상황 입력 모달 (+ 베팅 섹션)
 // ═══════════════════════════════════════════
-const CHIPS = [
-    '맨손 격투','무기 결투','총기 전투','칼싸움',
-    '말싸움 / 설전','협상 / 심리전','법정 공방',
-    '전쟁터 / 전면전','암살 임무','서바이벌',
-    '술집 패싸움','체스 / 두뇌 게임',
-    '마법 결투','정치 권력 싸움','스포츠 대결',
-];
-
 function showConditionModal() {
     document.getElementById('ba-condition-modal')?.remove();
+    checkRefill();
+    const s = getSettings();
+    const fighters = state.selectedFighters;
+
     const modal = document.createElement('div');
     modal.id = 'ba-condition-modal';
-    // 드래그 가능한 플로팅 패널 — 오버레이 없음
-    // 화면 중앙 계산해서 top/left로 직접 설정 (transform 없음 — 드래그 가능)
     const mw = Math.min(380, window.innerWidth * 0.9);
     const ml = Math.max(10, (window.innerWidth - mw) / 2);
-    const mt = Math.max(10, Math.min(window.innerHeight * 0.15, window.innerHeight - 320));
-    modal.style.cssText = `position:fixed;top:${mt}px;left:${ml}px;width:${mw}px;background:${C().bgCard};border:2px solid ${C().borderBright};border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,0.5);z-index:10200;display:flex;flex-direction:column;overflow:hidden`;
+    const mt = Math.max(10, Math.min(window.innerHeight * 0.1, window.innerHeight - 480));
+    modal.style.cssText = `position:fixed;top:${mt}px;left:${ml}px;width:${mw}px;max-height:85vh;overflow-y:auto;background:${C().bgCard};border:2px solid ${C().borderBright};border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,0.5);z-index:10200;display:flex;flex-direction:column`;
+
+    const betFighterOpts = fighters.map(f =>
+        `<option value="${esc(f.id)}" data-name="${esc(f.name)}">${esc(f.name)}</option>`
+    ).join('');
 
     modal.innerHTML = `
         <div id="ba-cond-drag" style="background:${C().bg};border-bottom:1px solid ${C().border};padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:move;flex-shrink:0;user-select:none">
@@ -540,9 +626,29 @@ function showConditionModal() {
             <button id="ba-cond-cancel" style="background:none;border:1px solid ${C().border};border-radius:2px;color:${C().textDim};cursor:pointer;font-size:11px;padding:2px 7px;font-family:monospace;line-height:1">✕</button>
         </div>
         <div style="padding:16px">
-            <textarea id="ba-cond-ta" placeholder="어떤 상황에서 싸우나요?&#10;예) 좁은 골목 야간 칼싸움. 양쪽 단도 1자루.&#10;예) 법정 최후변론 대결.&#10;예) 전쟁터 — 각자 100명 병력 지휘.&#10;예) 말싸움 / 설전 / 협상 / 심리전&#10;비워두면 기본 대결로 진행합니다." rows="6"
-                style="width:100%;background:${C().bg};border:1px solid ${C().border};border-radius:2px;padding:10px;color:${C().text};font-size:12px;font-family:system-ui;line-height:1.8;resize:vertical;outline:none;box-sizing:border-box;min-height:110px"></textarea>
-            <button id="ba-cond-go" style="width:100%;margin-top:10px;padding:12px;background:${C().accent};border:none;border-radius:2px;color:#fff;cursor:pointer;font-family:'Press Start 2P',monospace;font-size:10px;letter-spacing:2px">⚔️  FIGHT!</button>
+            <textarea id="ba-cond-ta" placeholder="어떤 상황에서 싸우나요?&#10;예) 좁은 골목 야간 칼싸움. 양쪽 단도 1자루.&#10;예) 법정 최후변론 대결.&#10;예) 재산/자산 규모 대결.&#10;예) 외모/신체 비교.&#10;비워두면 기본 대결로 진행합니다." rows="5"
+                style="width:100%;background:${C().bg};border:1px solid ${C().border};border-radius:2px;padding:10px;color:${C().text};font-size:12px;font-family:system-ui;line-height:1.8;resize:vertical;outline:none;box-sizing:border-box;min-height:90px"></textarea>
+
+            <div style="display:flex;align-items:center;gap:8px;margin:14px 0 10px">
+                <div style="flex:1;height:1px;background:linear-gradient(90deg,${C().accent}44,transparent)"></div>
+                <div style="font-size:10px;color:${C().borderBright};letter-spacing:2px;font-family:'Press Start 2P',monospace">🎲 BET</div>
+                <div style="flex:1;height:1px;background:linear-gradient(270deg,${C().accent}44,transparent)"></div>
+            </div>
+
+            <div style="background:${C().bgDeep};border:1px solid ${C().border};border-radius:2px;padding:10px;margin-bottom:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:${C().textDim};margin-bottom:8px">
+                    <span>보유 포인트: <b style="color:${C().gold}">${s.points}P</b></span>
+                    <span style="font-size:9px">⏰ 다음 충전 ${getRefillCountdown()}</span>
+                </div>
+                <select id="ba-bet-fighter" style="width:100%;background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;color:${C().text};font-size:12px;padding:6px 8px;font-family:system-ui;outline:none;margin-bottom:8px">
+                    <option value="">베팅 안 함</option>
+                    ${betFighterOpts}
+                </select>
+                <input id="ba-bet-amount" type="number" min="0" max="${s.points}" step="5" placeholder="베팅 포인트 (0~${s.points})"
+                    style="width:100%;background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;color:${C().text};font-size:12px;padding:6px 8px;font-family:system-ui;outline:none;box-sizing:border-box">
+            </div>
+
+            <button id="ba-cond-go" style="width:100%;margin-top:6px;padding:12px;background:${C().accent};border:none;border-radius:2px;color:#fff;cursor:pointer;font-family:'Press Start 2P',monospace;font-size:10px;letter-spacing:2px">⚔️  FIGHT!</button>
         </div>`;
 
     document.body.appendChild(modal);
@@ -551,8 +657,26 @@ function showConditionModal() {
     document.getElementById('ba-cond-cancel')?.addEventListener('click', ()=>modal.remove());
     document.getElementById('ba-cond-go')?.addEventListener('click', async ()=>{
         const cond = document.getElementById('ba-cond-ta')?.value.trim()||'';
+        const betSelect = document.getElementById('ba-bet-fighter');
+        const betAmountInput = document.getElementById('ba-bet-amount');
+        const fighterId = betSelect?.value || '';
+        let bet = null;
+        if (fighterId) {
+            const amount = parseInt(betAmountInput?.value) || 0;
+            const cur = getSettings();
+            if (amount <= 0) {
+                toastr.warning('베팅 포인트를 1 이상 입력하세요');
+                return;
+            }
+            if (amount > cur.points) {
+                toastr.error('보유 포인트보다 많이 베팅할 수 없어요');
+                return;
+            }
+            const fighterName = betSelect.options[betSelect.selectedIndex]?.dataset.name;
+            bet = { fighterId, fighterName, amount };
+        }
         modal.remove();
-        await runBattle(cond);
+        await runBattle(cond, bet);
     });
 }
 
@@ -574,11 +698,12 @@ function getPositions(n, r=70) {
 function renderArenaTab() {
     const content = document.getElementById('ba-content');
     if (!content) return;
+    checkRefill();
     const roster   = getRoster();
     const fighters = state.selectedFighters;
     const canFight = fighters.length >= 2;
+    const s = getSettings();
 
-    // SVG 연결선
     const lines = fighters.length >= 2
         ? getPositions(fighters.length).map((p,i,arr)=>{
             const nx=arr[(i+1)%arr.length];
@@ -586,7 +711,6 @@ function renderArenaTab() {
           }).join('')
         : '';
 
-    // 파이터 슬롯 DOM
     const slots = fighters.length===0
         ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
                <div style="font-size:10px;color:${C().textDim};letter-spacing:2px;text-align:center;line-height:3">NO FIGHTERS<br>SELECTED</div>
@@ -608,7 +732,6 @@ function renderArenaTab() {
             </div>`;
           }).join('');
 
-    // 파워 배지
     const badges = canFight
         ? `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;justify-content:center">
             ${fighters.map(f=>`<div style="display:flex;align-items:center;gap:4px;background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;padding:4px 8px">
@@ -618,9 +741,8 @@ function renderArenaTab() {
            </div>`
         : '';
 
-    // 캐릭터 카드 목록
     const cards = roster.length===0
-        ? `<div style="text-align:center;color:${C().textDim};font-size:11px;padding:20px 0;letter-spacing:1px;line-height:3">NO FIGHTERS IN ROSTER<br><span style="font-size:13px;color:#331500">Add characters via Scouter first</span></div>`
+        ? `<div style="text-align:center;color:${C().textDim};font-size:11px;padding:20px 0;letter-spacing:1px;line-height:3">NO FIGHTERS IN ROSTER<br><span style="font-size:13px;color:${C().textDim}">Add characters via Scouter first</span></div>`
         : roster.map(char=>{
             const sel = !!fighters.find(f=>f.id===char.id);
             const url = resolveAvatarUrl(char.name);
@@ -653,16 +775,22 @@ function renderArenaTab() {
             </div>`;
         }).join('');
 
+    const pointsHeader = `
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 14px;background:${C().bgDeep};border-bottom:1px solid ${C().border}">
+            <span style="font-family:'Press Start 2P',monospace;font-size:11px;color:${C().gold}">💰 ${s.points}P</span>
+            <span style="font-size:10px;color:${C().textDim}">⏰ ${getRefillCountdown()}</span>
+        </div>`;
+
     content.innerHTML = `
-        <!-- 아레나 원형 -->
+        ${pointsHeader}
         <div style="padding:14px 14px 8px;display:flex;flex-direction:column;align-items:center">
             <div style="position:relative;width:200px;height:200px;margin:0 auto;flex-shrink:0">
                 <svg viewBox="0 0 200 200" style="position:absolute;inset:0;width:100%;height:100%">
                     <circle cx="100" cy="100" r="92" fill="${C().bgDeep}" stroke="${C().border}" stroke-width="1"/>
                     <circle cx="100" cy="100" r="90" fill="none" stroke="${C().border}" stroke-width="2" stroke-dasharray="8 4" class="ba-pulse-ring"/>
                     <circle cx="100" cy="100" r="80" fill="none" stroke="${C().bgDeep}" stroke-width="1"/>
-                    <line x1="100" y1="10" x2="100" y2="190" stroke="#221100" stroke-width="1" opacity="0.4"/>
-                    <line x1="10" y1="100" x2="190" y2="100" stroke="#221100" stroke-width="1" opacity="0.4"/>
+                    <line x1="100" y1="10" x2="100" y2="190" stroke="${C().border}" stroke-width="1" opacity="0.4"/>
+                    <line x1="10" y1="100" x2="190" y2="100" stroke="${C().border}" stroke-width="1" opacity="0.4"/>
                     <text x="100" y="106" text-anchor="middle" fill="${C().border}" font-size="18" font-family="monospace">⚔️</text>
                     ${lines}
                 </svg>
@@ -671,23 +799,19 @@ function renderArenaTab() {
             ${badges}
         </div>
 
-        <!-- 구분선 -->
         <div style="display:flex;align-items:center;gap:8px;margin:12px 14px 10px">
             <div style="flex:1;height:1px;background:linear-gradient(90deg,${C().accent}44,transparent)"></div>
             <div style="font-size:10px;color:${C().borderBright};letter-spacing:2px;font-family:'Press Start 2P',monospace">SELECT FIGHTERS</div>
             <div style="flex:1;height:1px;background:linear-gradient(270deg,${C().accent}44,transparent)"></div>
         </div>
 
-        <!-- 캐릭터 목록 -->
         <div style="padding:0 14px 6px">${cards}</div>
 
-        <!-- 배틀 버튼 -->
         <button id="ba-fight-btn" ${canFight?'':'disabled'}
             style="display:block;width:calc(100% - 28px);margin:0 14px 14px;padding:12px;background:${canFight?C().bgCard:C().bg};border:2px solid ${canFight?C().borderBright:C().border};border-radius:2px;color:${canFight?C().accent:C().textDim};font-family:'Press Start 2P',monospace;font-size:13px;letter-spacing:2px;cursor:${canFight?'pointer':'not-allowed'};text-shadow:${canFight?`0 0 8px ${C().accent}88`:'none'};box-shadow:${canFight?`0 0 12px ${C().accent}33`:'none'};opacity:${canFight?1:0.4};transition:all 0.15s">
             ${canFight?`⚔️  FIGHT  (${fighters.length} FIGHTERS)`:fighters.length===0?'SELECT 2+ FIGHTERS':`SELECT ${2-fighters.length} MORE`}
         </button>`;
 
-    // 이벤트
     content.querySelectorAll('.ba-char-card').forEach(card=>{
         card.addEventListener('click',()=>{
             const id   = card.dataset.id;
@@ -700,7 +824,6 @@ function renderArenaTab() {
         });
     });
 
-    // 전투 프로필 버튼
     content.querySelectorAll('.ba-combat-profile-btn').forEach(btn=>{
         btn.addEventListener('click', e=>{
             e.stopPropagation();
@@ -736,6 +859,7 @@ function renderRecordsTab() {
             style="background:${C().bgCard};border:1px solid ${C().border};border-left:3px solid ${C().accent};border-radius:2px;padding:9px 11px;cursor:pointer;margin-bottom:6px;transition:all 0.15s;display:flex;align-items:center;gap:8px">
             <div style="flex:1;min-width:0">
                 <div style="font-size:10px;color:${C().gold};font-family:'Press Start 2P',monospace;letter-spacing:1px;margin-bottom:3px">🏆 ${esc(r.winner)}${r.winRate?` (${r.winRate}%)`:''}
+                    ${r.bet ? `<span style="color:${r.bet.won?C().gold:'#ff5555'};margin-left:6px">${r.bet.won?'+':'-'}${r.bet.amount}P</span>` : ''}
                 </div>
                 <div style="font-size:10px;color:${C().textDim};margin-top:2px">${esc(r.fighters.map(f=>f.name).join(' VS '))}</div>
                 <div style="font-size:13px;color:${C().textDim};margin-top:2px">${esc((r.condition||'').slice(0,40))}${(r.condition||'').length>40?'...':''}</div>
@@ -770,12 +894,39 @@ function renderRecordsTab() {
 function renderSettingsTab() {
     const content = document.getElementById('ba-content');
     if (!content) return;
+    checkRefill();
     const ctx = SillyTavern.getContext();
     const s   = getSettings();
     const profiles = ctx.extensionSettings?.['connectionManager']?.profiles || [];
     const saved    = s.selectedProfileName || '';
 
+    const themeButtons = [
+        { id:'dark',     label:'🌙 다크',   always:true },
+        { id:'light',    label:'☀️ 라이트', always:true },
+        ...THEME_UNLOCKS.map(u=>({ id:u.id, label:u.label, always:false, threshold:u.threshold })),
+    ];
+
+    const themeButtonsHtml = themeButtons.map(t => {
+        const unlocked = t.always || s.unlockedThemes.includes(t.id);
+        const active = _theme === t.id;
+        return `<button class="ba-theme-pick" data-theme="${t.id}" ${unlocked?'':'disabled'}
+            style="padding:8px 6px;background:${active?C().accent:C().bgCard};border:1px solid ${active?C().accent:C().border};border-radius:2px;color:${active?'#fff':unlocked?C().text:C().textDim};font-size:10px;font-family:system-ui;cursor:${unlocked?'pointer':'not-allowed'};opacity:${unlocked?1:0.5};position:relative">
+            ${t.label}${!unlocked?`<div style="font-size:8px;margin-top:2px">🔒 ${t.threshold}P</div>`:''}
+        </button>`;
+    }).join('');
+
     content.innerHTML = `<div style="padding:16px;font-family:system-ui,sans-serif">
+        <div style="font-size:9px;font-family:'Press Start 2P',monospace;color:${C().borderBright};letter-spacing:2px;border-bottom:1px solid ${C().border};padding-bottom:6px;margin-bottom:12px">💰 POINTS</div>
+        <div style="background:${C().bgDeep};border:1px solid ${C().border};border-radius:2px;padding:12px;margin-bottom:14px;text-align:center">
+            <div style="font-family:'Press Start 2P',monospace;font-size:18px;color:${C().gold}">${s.points}P</div>
+            <div style="font-size:10px;color:${C().textDim};margin-top:4px">누적 ${s.lifetimePoints}P · 다음 충전 ${getRefillCountdown()}</div>
+        </div>
+
+        <div style="font-size:9px;font-family:'Press Start 2P',monospace;color:${C().borderBright};letter-spacing:2px;border-bottom:1px solid ${C().border};padding-bottom:6px;margin-bottom:10px">🎨 THEMES</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
+            ${themeButtonsHtml}
+        </div>
+
         <div style="font-size:9px;font-family:'Press Start 2P',monospace;color:${C().borderBright};letter-spacing:2px;border-bottom:1px solid ${C().border};padding-bottom:6px;margin-bottom:12px">AI CONFIG</div>
         <div style="margin-bottom:12px">
             <div style="font-size:11px;color:${C().text};margin-bottom:5px">Connection Profile</div>
@@ -797,6 +948,17 @@ function renderSettingsTab() {
             챗틀로얄 v2.0 · by 봉봉
         </div>
     </div>`;
+
+    document.querySelectorAll('.ba-theme-pick').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+            if (btn.disabled) return;
+            const wasTab = state.currentTab;
+            saveTheme(btn.dataset.theme);
+            closePanel();
+            openPanel();
+            if (wasTab !== 'arena') switchTab(wasTab);
+        });
+    });
 
     document.getElementById('ba-prof-sel')?.addEventListener('change',e=>{
         const s2=getSettings(); s2.selectedProfileName=e.target.value||null; save();
@@ -837,7 +999,7 @@ function makeDraggable(panel, handle) {
         drag=true; sx=cx; sy=cy;
         const r=panel.getBoundingClientRect(); sl=r.left; st=r.top;
         panel.style.right='auto';
-        panel.style.transform='none';  // transform 제거해야 드래그 위치 정확함
+        panel.style.transform='none';
         document.body.style.userSelect='none';
     };
     const mv=(cx,cy)=>{
@@ -913,7 +1075,8 @@ function openPanel() {
     document.getElementById('ba-close')?.addEventListener('click', closePanel);
     document.getElementById('ba-theme-btn')?.addEventListener('click', () => {
         const wasTab = state.currentTab;
-        saveTheme(_theme === 'dark' ? 'light' : 'dark');
+        const next = _theme === 'dark' ? 'light' : 'dark';
+        saveTheme(next);
         closePanel();
         openPanel();
         if (wasTab !== 'arena') switchTab(wasTab);
@@ -965,6 +1128,7 @@ export async function onActivate() {
     console.log(`[${MODULE_NAME}] activate`);
     injectCSS();
     _theme = getSettings().theme || 'dark';
+    checkRefill();
 
     const ctx = SillyTavern.getContext();
     const profiles = ctx.extensionSettings?.['connectionManager']?.profiles || [];
@@ -996,12 +1160,36 @@ export async function onActivate() {
     }
 
     if (!document.getElementById('ba-wand-btn')) {
-        const btn=`<div id="ba-wand-btn" title="챗틀로얄" style="cursor:pointer;padding:4px 8px;display:flex;align-items:center;gap:5px;font-size:13px">
-            <span>⚔️</span><span style="font-size:12px">챗틀로얄</span>
-        </div>`;
-        const tb = document.getElementById('extensionsMenu') ?? document.getElementById('top-bar');
-        tb?.insertAdjacentHTML('beforeend', btn);
-        document.getElementById('ba-wand-btn')?.addEventListener('click', togglePanel);
+        const btn = document.createElement('div');
+        btn.id = 'ba-wand-btn';
+        btn.title = '챗틀로얄';
+        btn.style.cssText = 'cursor:pointer;padding:4px 8px;display:flex;align-items:center;gap:5px;font-size:13px;position:fixed;bottom:70px;right:20px;z-index:9000;background:#1a0800;border:2px solid #884400;border-radius:50%;width:50px;height:50px;justify-content:center;box-shadow:0 4px 16px rgba(255,100,0,0.3)';
+        btn.innerHTML = '<span style="font-size:22px">⚔️</span>';
+
+        const candidates = [
+            'extensionsMenu', 'top-bar', 'top-settings-holder',
+            'rightSendForm', 'send_form', 'leftSendForm',
+        ];
+        let target = null;
+        for (const id of candidates) {
+            const el = document.getElementById(id);
+            if (el) { target = el; break; }
+        }
+
+        if (target) {
+            btn.style.position = 'static';
+            btn.style.width = 'auto';
+            btn.style.height = 'auto';
+            btn.style.borderRadius = '2px';
+            btn.style.boxShadow = 'none';
+            btn.innerHTML = '<span>⚔️</span><span style="font-size:12px;margin-left:4px">챗틀로얄</span>';
+            target.appendChild(btn);
+        } else {
+            document.body.appendChild(btn);
+        }
+
+        btn.addEventListener('click', togglePanel);
+        console.log(`[${MODULE_NAME}] 버튼 삽입 위치:`, target ? target.id : 'fallback floating button');
     }
 
     document.addEventListener('keydown', e=>{ if(e.key==='Escape'&&state.isPanelOpen) closePanel(); });
