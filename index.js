@@ -35,37 +35,37 @@ const THEMES = {
         resultBg: '#fdfcff', resultBorder: '#c8b8ee',
         tabInactive: '#aa99cc',
     },
-    platypus: {
-        bg: '#fff8f0', bgCard: '#fffaf5', bgDeep: '#fcefe0',
-        border: '#e8c8a0', borderBright: '#cc9955',
-        text: '#7a5530', textDim: '#bb9970', textBright: '#5a3a10',
-        accent: '#dd8833', gold: '#bb6622',
-        resultBg: '#fffbf6', resultBorder: '#e8c8a0',
-        tabInactive: '#ddbb88',
+    snow: {
+        bg: '#ffffff', bgCard: '#f7fbfd', bgDeep: '#e8f2f7',
+        border: '#c8e0ec', borderBright: '#8fc3dc',
+        text: '#1f3a4a', textDim: '#7fa3b8', textBright: '#0a1f2b',
+        accent: '#4a9bc4', gold: '#2c5e75',
+        resultBg: '#fbfeff', resultBorder: '#c8e0ec',
+        tabInactive: '#b3d4e3',
     },
     deer: {
-        bg: '#f3fbf8', bgCard: '#fbfffd', bgDeep: '#e6f7ef',
-        border: '#bfe8d8', borderBright: '#7fcdb0',
-        text: '#3a6e5e', textDim: '#9bc9b8', textBright: '#1f4a3c',
-        accent: '#5fb89a', gold: '#9b8fd9',
-        resultBg: '#fbfffd', resultBorder: '#bfe8d8',
-        tabInactive: '#a8d9c8',
+        bg: '#f6faf3', bgCard: '#fbfff8', bgDeep: '#e8f2e0',
+        border: '#bcd9a8', borderBright: '#7fae5c',
+        text: '#3e5c2c', textDim: '#8fae78', textBright: '#23380f',
+        accent: '#6f9d4a', gold: '#c98a9a',
+        resultBg: '#fbfff8', resultBorder: '#bcd9a8',
+        tabInactive: '#a8cf90',
     },
     tiger: {
-        bg: '#fff7ec', bgCard: '#fffbf3', bgDeep: '#ffe8c8',
-        border: '#f0c090', borderBright: '#cc7722',
-        text: '#4a2800', textDim: '#b88550', textBright: '#2a1500',
-        accent: '#e8650a', gold: '#1f1f1f',
-        resultBg: '#fffcf6', resultBorder: '#f0c090',
-        tabInactive: '#e0b888',
+        bg: '#fff6e8', bgCard: '#fffaf0', bgDeep: '#ffe6bf',
+        border: '#e8b878', borderBright: '#c9821f',
+        text: '#4a2e08', textDim: '#b3895a', textBright: '#2c1a00',
+        accent: '#d9711a', gold: '#26344a',
+        resultBg: '#fffaf0', resultBorder: '#e8b878',
+        tabInactive: '#e0c090',
     },
-    retriever: {
-        bg: '#fffaf0', bgCard: '#fffdf8', bgDeep: '#fff0d8',
-        border: '#f0d8a0', borderBright: '#e0b050',
-        text: '#6a4a10', textDim: '#c0a060', textBright: '#4a3000',
-        accent: '#f0a830', gold: '#d4880a',
-        resultBg: '#fffdf8', resultBorder: '#f0d8a0',
-        tabInactive: '#e8cc90',
+    ghost: {
+        bg: '#0a0a0a', bgCard: '#141414', bgDeep: '#050505',
+        border: '#3a3a3a', borderBright: '#6a6a6a',
+        text: '#d8d8d8', textDim: '#8a8a8a', textBright: '#ffffff',
+        accent: '#6b7a5e', gold: '#b23a3a',
+        resultBg: '#0d0d0d', resultBorder: '#3a3a3a',
+        tabInactive: '#5a5a5a',
     },
 };
 let _theme = 'dark';
@@ -82,10 +82,10 @@ const STAT_META = {
 
 // ─── 해금 마일스톤 ──────────────────────────
 const THEME_UNLOCKS = [
-    { id: 'platypus',  threshold: 500,  label: '🦆 오리너구리', icon: '🦆' },
-    { id: 'deer',      threshold: 1000, label: '🦌 고라니',     icon: '🦌' },
-    { id: 'tiger',     threshold: 1500, label: '🐯 호랑이',     icon: '🐯' },
-    { id: 'retriever', threshold: 2000, label: '🐶 챱츄',       icon: '🐶' },
+    { id: 'snow',  threshold: 500,  label: '❄️ 스노우', icon: '❄️' },
+    { id: 'deer',  threshold: 1000, label: '🦌 고라니', icon: '🦌' },
+    { id: 'tiger', threshold: 1500, label: '🐅 호랑이', icon: '🐅' },
+    { id: 'ghost', threshold: 2000, label: '💀 고스트', icon: '💀' },
 ];
 
 // ─── 기본 설정 ─────────────────────────────
