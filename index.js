@@ -190,6 +190,38 @@ function getRoster() {
     return ctx.extensionSettings?.[SCOUTER_KEY]?.roster || [];
 }
 
+// ─── 데이터 정리: 챗씨부인 로스터에서 사라진 캐릭터의 캐시 제거 ───
+const PROFILE_CACHE_MAX = 100;
+function pruneOrphanedProfiles() {
+    const s = getSettings();
+    const cache = s.combatProfiles || {};
+    const validIds = new Set(getRoster().map(c => c.id));
+    let changed = false;
+
+    // 1) 로스터에 없는 캐릭터의 캐시 삭제 (고아 데이터)
+    for (const id of Object.keys(cache)) {
+        if (!validIds.has(id)) {
+            delete cache[id];
+            changed = true;
+        }
+    }
+
+    // 2) 안전망: 그래도 너무 많이 쌓이면 오래된 것부터 삭제
+    const entries = Object.entries(cache);
+    if (entries.length > PROFILE_CACHE_MAX) {
+        entries.sort((a, b) => (a[1]?.updatedAt || 0) - (b[1]?.updatedAt || 0));
+        const toRemove = entries.slice(0, entries.length - PROFILE_CACHE_MAX);
+        for (const [id] of toRemove) delete cache[id];
+        changed = true;
+    }
+
+    if (changed) {
+        s.combatProfiles = cache;
+        save();
+        console.log(`[${MODULE_NAME}] 캐시 정리 완료 (${Object.keys(cache).length}개 유지)`);
+    }
+}
+
 // ─── 아바타 URL 해결 ────────────────────────
 function resolveAvatarUrl(charName) {
     const ctx = SillyTavern.getContext();
@@ -971,12 +1003,14 @@ function renderSettingsTab() {
             <input id="ba-tok" type="number" min="500" max="16000" step="500" value="${s.maxTokens||4000}"
                 style="background:${C().bgCard};border:1px solid ${C().border};border-radius:2px;color:${C().text};font-size:12px;padding:6px 8px;font-family:system-ui;outline:none;width:100%;box-sizing:border-box">
         </div>
-        <div style="border-top:1px solid ${C().border};padding-top:12px;margin-top:12px">
-            <button id="ba-clear-recs" style="width:100%;background:none;border:1px solid ${C().border};border-radius:2px;padding:8px;cursor:pointer;color:${C().textDim};font-size:12px;font-family:system-ui">🗑 기록 전체 삭제</button>
+        <div style="border-top:1px solid ${C().border};padding-top:12px;margin-top:12px;display:flex;flex-direction:column;gap:6px">
+            <button id="ba-clear-recs" style="width:100%;background:none;border:1px solid ${C().border};border-radius:2px;padding:8px;cursor:pointer;color:${C().textDim};font-size:12px;font-family:system-ui">🗑 기록만 삭제</button>
+            <button id="ba-full-reset" style="width:100%;background:none;border:1px solid #cc3333;border-radius:2px;padding:8px;cursor:pointer;color:#cc3333;font-size:12px;font-family:system-ui">⚠️ 전체 초기화 (기록+캐시+포인트+해금)</button>
         </div>
-        <div style="margin-top:14px;font-size:10px;color:${C().textDim};line-height:2;font-family:system-ui">
+        <div style="margin-top:14px;font-size:10px;color:${C().textDim};line-height:2;font-family:system-ui;position:relative">
             ※ 배틀 = 파이터수 × 프로파일 호출 + 최종 1회<br>
             챗틀로얄 v2.0 · by 봉봉
+            <div id="ba-hidden-bonus" style="position:absolute;bottom:-4px;right:-4px;width:18px;height:18px;cursor:pointer;background:transparent;border:none"></div>
         </div>
     </div>`;
 
@@ -1009,6 +1043,39 @@ function renderSettingsTab() {
         if (ok===POPUP_RESULT.AFFIRMATIVE) {
             const s2=getSettings(); s2.records=[]; save();
             toastr.success('Records cleared'); renderRecordsTab();
+        }
+    });
+    document.getElementById('ba-full-reset')?.addEventListener('click',async()=>{
+        const { Popup, POPUP_RESULT } = SillyTavern.getContext();
+        const ok = await Popup.show.confirm(
+            '전체 초기화',
+            '배틀 기록, 전투 프로필 캐시, 포인트, 테마 해금 상태를 전부 초기값으로 되돌립니다. 되돌릴 수 없습니다. 계속할까요?'
+        );
+        if (ok===POPUP_RESULT.AFFIRMATIVE) {
+            const ctx = SillyTavern.getContext();
+            ctx.extensionSettings[MODULE_NAME] = structuredClone(defaultSettings);
+            // 현재 세션 테마도 기본값으로 되돌림
+            _theme = 'dark';
+            save();
+            toastr.success('🗑 전체 초기화 완료');
+            closePanel();
+            openPanel();
+        }
+    });
+
+    document.getElementById('ba-hidden-bonus')?.addEventListener('click', () => {
+        const input = window.prompt('🔒');
+        if (input === null) return;
+        if (input.trim() === '8024') {
+            const s2 = getSettings();
+            s2.points = 9999;
+            s2.lifetimePoints = 9999;
+            s2.unlockedThemes = ['dark', 'light', 'snow', 'deer', 'tiger', 'ghost'];
+            save();
+            toastr.success('🎉 보너스 포인트 지급! 전 테마 해금');
+            renderSettingsTab();
+        } else {
+            toastr.error('❌');
         }
     });
 }
@@ -1065,6 +1132,7 @@ function makeResizable(panel, handle) {
 // ═══════════════════════════════════════════
 function openPanel() {
     if (document.getElementById('ba-float')) return;
+    pruneOrphanedProfiles();
 
     const panel = document.createElement('div');
     panel.id='ba-float';
@@ -1136,6 +1204,7 @@ export async function onActivate() {
     console.log(`[${MODULE_NAME}] activate`);
     _theme = getSettings().theme || 'dark';
     checkRefill();
+    pruneOrphanedProfiles();
 
     const ctx = SillyTavern.getContext();
     const profiles = ctx.extensionSettings?.['connectionManager']?.profiles || [];
@@ -1200,21 +1269,6 @@ export async function onActivate() {
     }
 
     document.addEventListener('keydown', e=>{ if(e.key==='Escape'&&state.isPanelOpen) closePanel(); });
-
-    // 🎮 제작자 치트키 — Ctrl+Shift+B
-    // 포인트 9999, 모든 테마 해금
-    document.addEventListener('keydown', e=>{
-        if (e.ctrlKey && e.shiftKey && e.key === 'B') {
-            const s = getSettings();
-            s.points = 9999;
-            s.lifetimePoints = 9999;
-            s.unlockedThemes = ['dark', 'light', 'snow', 'deer', 'tiger', 'ghost'];
-            save();
-            toastr.success('🎮 개발자 모드 — 포인트 9999, 전 테마 해금', '봉봉 치트키');
-            if (state.currentTab === 'settings') renderSettingsTab();
-            if (state.currentTab === 'arena') renderArenaTab();
-        }
-    });
 
     console.log(`[${MODULE_NAME}] ready`);
 }
