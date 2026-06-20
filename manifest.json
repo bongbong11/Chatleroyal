@@ -7,7 +7,7 @@
     "css": "style.css",
     "author": "봉봉",
     "version": "2.0.0",
-    "homePage": "https://github.com/bongbong11/Scouter",
+    "homePage": "https://github.com/bongbong11/Chatleroyal",
     "auto_update": false,
     "hooks": {
         "activate": "onActivate"
